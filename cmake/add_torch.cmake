@@ -1,21 +1,23 @@
 set(torch_dir ${CMAKE_CURRENT_BINARY_DIR}/torch)
-
 set(torch_lib_name torch)
 
-set(torch_dir ${CMAKE_CURRENT_BINARY_DIR}/torch)
-set(torch_lib_name torch)
+if (APPLE_ARM64) 
+  set(torch_library_path ${torch_dir}/lib/python3.10/site-packages/torch/lib)
+else()
+  set(torch_library_path ${torch_dir}/libtorch/lib)
+endif()
+
 find_library(torch_lib
   NAMES ${torch_lib_name}
-  PATHS ${torch_dir}/libtorch/lib
+  PATHS ${torch_library_path}
 )
 
 if (DEFINED torch_version)
   message("setting torch version : ${torch_version}")
 else()
-  set(torch_version "1.11.0")
+  set(torch_version "2.0.1")
   message("torch version : ${torch_version}")
 endif()
-
 
 if (NOT torch_lib)
   message(STATUS "Downloading torch C API pre-built")
@@ -25,8 +27,13 @@ if (NOT torch_lib)
     set(torch_url
         "https://download.pytorch.org/libtorch/cpu/libtorch-cxx11-abi-shared-with-deps-${torch_version}%2Bcpu.zip")
   elseif (UNIX AND APPLE)  # OSX
-    set(torch_url
+    if (APPLE_ARM64)
+      set(torch_url
+          "https://anaconda.org/pytorch/pytorch/${torch_version}/download/osx-arm64/pytorch-2.0.1-py3.10_0.tar.bz2")
+    else()
+      set(torch_url
         "https://download.pytorch.org/libtorch/cpu/libtorch-macos-${torch_version}.zip")
+    endif()
   else()                   # Windows
     set(torch_url
         "https://download.pytorch.org/libtorch/cpu/libtorch-win-shared-with-deps-${torch_version}%2Bcpu.zip")
@@ -47,8 +54,9 @@ endif()
 # Find the libraries again
 find_library(torch_lib
   NAMES ${torch_lib_name}
-  PATHS ${torch_dir}/libtorch/lib
+  PATHS ${torch_library_path}
 )
+
 if (NOT torch_lib)
   message(FATAL_ERROR "torch could not be included")
 endif()
