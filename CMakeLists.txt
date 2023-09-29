@@ -9,8 +9,10 @@ endif()
 
 if(APPLE)
   set (formats AU VST3 Standalone)
+  set (APPLE_ARM64 (CMAKE_SYSTEM_PROCESSOR STREQUAL "arm64"))
 else()
   set (formats VST3 Standalone)
+  set (APPLE_ARM64 FALSE)
 endif()
 
 
@@ -42,7 +44,12 @@ endfunction()
 ##### Torch related
 list(APPEND CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/cmake")
 include(add_torch)
-list(APPEND CMAKE_PREFIX_PATH "${torch_dir}/libtorch")
+if (APPLE_ARM64)
+  message("linking ${torch_dir}/lib/python3.10/site-packages/torch")
+  list(APPEND CMAKE_PREFIX_PATH "${torch_dir}/lib/python3.10/site-packages/torch")
+else()
+  list(APPEND CMAKE_PREFIX_PATH "${torch_dir}/libtorch")
+endif()
 find_package(Torch REQUIRED)
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${TORCH_CXX_FLAGS}")
 
