@@ -26,7 +26,7 @@ if (NOT torch_lib)
   if (UNIX AND NOT APPLE)  # Linux
     set(torch_url
         "https://download.pytorch.org/libtorch/cpu/libtorch-cxx11-abi-shared-with-deps-${torch_version}%2Bcpu.zip")
-  elseif (UNIX AND APPLE)  # OSX
+  elseif (UNIX AND APPLE)  # OSXx
     if (APPLE_ARM64)
       set(torch_url
           "https://anaconda.org/pytorch/pytorch/${torch_version}/download/osx-arm64/pytorch-2.0.1-py3.10_0.tar.bz2")
@@ -34,6 +34,7 @@ if (NOT torch_lib)
       set(torch_url
         "https://download.pytorch.org/libtorch/cpu/libtorch-macos-${torch_version}.zip")
     endif()
+    message("ARM64 ${APPLE_ARM64} detected.\n torch download link : ${torch_url}")
   else()                   # Windows
     set(torch_url
         "https://download.pytorch.org/libtorch/cpu/libtorch-win-shared-with-deps-${torch_version}%2Bcpu.zip")
