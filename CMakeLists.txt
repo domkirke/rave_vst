@@ -44,12 +44,7 @@ endfunction()
 ##### Torch related
 list(APPEND CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/cmake")
 include(add_torch)
-if (APPLE_ARM64)
-  message("linking ${torch_dir}/lib/python3.10/site-packages/torch")
-  list(APPEND CMAKE_PREFIX_PATH "${torch_dir}/lib/python3.10/site-packages/torch")
-else()
-  list(APPEND CMAKE_PREFIX_PATH "${torch_dir}/libtorch")
-endif()
+list(APPEND CMAKE_PREFIX_PATH "${torch_dir}/libtorch")
 find_package(Torch REQUIRED)
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${TORCH_CXX_FLAGS}")
 
