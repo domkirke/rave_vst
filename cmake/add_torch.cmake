@@ -34,7 +34,7 @@ if (NOT torch_lib)
       set(torch_url
         "https://download.pytorch.org/libtorch/cpu/libtorch-macos-${torch_version}.zip")
     endif()
-    message("ARM64 ${APPLE_ARM64} detected.\n torch download link : ${torch_url}")
+    message("ARM64 ${CMAKE_SYSTEM_PROCESSOR} detected.\n torch download link : ${torch_url}")
   else()                   # Windows
     set(torch_url
         "https://download.pytorch.org/libtorch/cpu/libtorch-win-shared-with-deps-${torch_version}%2Bcpu.zip")
