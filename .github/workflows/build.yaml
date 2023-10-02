@@ -137,7 +137,7 @@ jobs:
         working-directory: build/rave-vst_artefacts
         run: |
           mv Release RAVE_VST
-          zip -r RAVE_VST/AU RAVE_VST/Standalone RAVE_VST/VST3 RAVE_VST_Windows_x64.zip
+          tar -czvf rave_vst_windows_x64.tar.gz RAVE_VST
 
       - name: Upload build artifacts
         uses: actions/upload-artifact@v3
