@@ -44,6 +44,10 @@ if (NOT torch_lib)
                   WORKING_DIRECTORY ${torch_dir})
 
   file(REMOVE ${torch_dir}/torch_cc.zip)
+  if (APPLE_ARM64)
+    file(RENAME "${CMAKE_CURRENT_BINARY_DIR}/torch/lib/python3.10/site-packages/torch" "${CMAKE_CURRENT_BINARY_DIR}/torch/torch")
+    file(RENAME "${CMAKE_CURRENT_BINARY_DIR}/torch/torch" "${CMAKE_CURRENT_BINARY_DIR}/torch/libtorch")
+  endif()
 
 endif()
 
