@@ -1,11 +1,6 @@
 set(torch_dir ${CMAKE_CURRENT_BINARY_DIR}/torch)
 set(torch_lib_name torch)
-
-if (APPLE_ARM64) 
-  set(torch_library_path ${torch_dir}/lib/python3.10/site-packages/torch/lib)
-else()
-  set(torch_library_path ${torch_dir}/libtorch/lib)
-endif()
+set(torch_library_path ${torch_dir}/libtorch/lib)
 
 find_library(torch_lib
   NAMES ${torch_lib_name}
