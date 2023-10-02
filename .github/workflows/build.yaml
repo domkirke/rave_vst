@@ -35,15 +35,20 @@ jobs:
         working-directory: build
         run: cmake --build . --config Release -j 4
 
+      - name: Compress
+        working-directory: build/rave-vst_artefacts
+        run: |
+          mv Release RAVE_VST
+          zip -r RAVE_VST/AU RAVE_VST/Standalone RAVE_VST/VST3 RAVE_VST_Ubuntu.zip
+
       - name: Upload build artifacts
         uses: actions/upload-artifact@v3
         with:
           name: RAVE_VST_Ubuntu
-          path: build/rave-vst_artefacts/Release
+          path: build/rave-vst_artefacts/RAVE_VST_Ubuntu.zip
 
-
-  macos_build:
-    runs-on: macOS-latest
+  macos_arm64_build:
+    runs-on: macos-latest
     steps:
       - name: Clone the repository
         uses: actions/checkout@v3
@@ -54,20 +59,58 @@ jobs:
         run: |
           mkdir -p build
           cd build
-          cmake .. -DCMAKE_BUILD_TYPE=Release
+          curl -L https://anaconda.org/pytorch/pytorch/2.0.1/download/osx-arm64/pytorch-2.0.1-py3.10_0.tar.bz2 | tar -xv
+          cmake .. -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_ARCHITECTURES=arm64
 
       - name: Build
         working-directory: build
         run: cmake --build . --config Release -j 4
 
+      - name: Compress
+        working-directory: build/rave-vst_artefacts
+        run: |
+          mv Release RAVE_VST
+          zip -r RAVE_VST/AU RAVE_VST/Standalone RAVE_VST/VST3 RAVE_VST_MacOS_arm64.zip
+
       - name: Upload build artifacts
         uses: actions/upload-artifact@v3
         with:
-          name: RAVE_VST_MacOS
-          path: build/rave-vst_artefacts/Release
+          name: RAVE_VST_MacOS_arm64
+          path: build/rave-vst_artefacts/RAVE_VST_MacOS_arm64.zip
+
+  macos_x86_build:
+    runs-on: macos-latest
+    steps:
+      - name: Clone the repository
+        uses: actions/checkout@v3
+        with:
+          submodules: recursive
+
+      - name: Setup the build
+        run: |
+          mkdir -p build
+          cd build
+          curl -L https://download.pytorch.org/libtorch/cpu/libtorch-macos-2.0.1.zip | tar -xv
+          cmake .. -DCMAKE_BUILD_TYPE=Release 
+
+      - name: Build
+        working-directory: build
+        run: cmake --build . --config Release -j 4
+
+      - name: Compress
+        working-directory: build/rave-vst_artefacts
+        run: |
+          mv Release RAVE_VST
+          zip -r RAVE_VST/AU RAVE_VST/Standalone RAVE_VST/VST3 RAVE_VST_MacOS_x86.zip
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: RAVE_VST_MacOS_x86
+          path: build/rave-vst_artefacts/RAVE_VST_MacOS_x86.zip
 
 
-  windows_build:
+  windows_build_x64:
     runs-on: windows-latest
     steps:
       - name: Clone the repository
@@ -84,9 +127,34 @@ jobs:
       - name: Build
         working-directory: build
         run: cmake --build . --config Release -j 4
+        
+      - name: Compress
+        working-directory: build/rave-vst_artefacts
+        run: |
+          mv Release RAVE_VST
+          zip -r RAVE_VST/AU RAVE_VST/Standalone RAVE_VST/VST3 RAVE_VST_Windows_x64.zip
 
       - name: Upload build artifacts
         uses: actions/upload-artifact@v3
         with:
           name: RAVE_VST_Windows
-          path: build/rave-vst_artefacts/Release
+          path: build/rave-vst_artefacts/RAVE_VST_Windows_x64.zip
+
+  AutomaticRelease:
+    runs-on: ubuntu-latest
+    needs: [macos_x86_build, macos_arm64_build, windows_build_x64, ubuntu_build]
+    steps:
+      - name: Download build binaries
+        uses: actions/download-artifact@v2
+        with:
+          name: RAVE_VST
+      - name: Automated Release
+        uses: "marvinpinto/action-automatic-releases@latest"
+        with:
+          repo_token: "${{ secrets.GITHUB_TOKEN }}"
+          prerelease: false
+          files: |
+            RAVE_VST_MacOS_Ubuntu.tar.gz
+            RAVE_VST_MacOS_arm64.tar.gz
+            RAVE_VST_MacOS_x86.tar.gz
+            RAVE_VST_Windows_x64.tar.gz
