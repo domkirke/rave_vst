@@ -1,5 +1,4 @@
-set(torch_dir ${CMAKE_CURRENT_BINARY_DIR}/torch)
-set(torch_lib_name torch)
+set(torch_dir ${CMAKE_CURRENT_BINARY_DIR})
 set(torch_library_path ${torch_dir}/libtorch/lib)
 
 find_library(torch_lib
