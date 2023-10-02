@@ -1,9 +1,10 @@
-set(torch_dir ${CMAKE_CURRENT_BINARY_DIR})
-set(torch_library_path ${torch_dir}/libtorch/lib)
+set(torch_dir ${CMAKE_CURRENT_BINARY_DIR}/torch)
+set(torch_lib_name torch)
 
+message("${torch_library_path}")
 find_library(torch_lib
   NAMES ${torch_lib_name}
-  PATHS ${torch_library_path}
+  PATHS ${torch_dir}/libtorch/lib
 )
 
 if (DEFINED torch_version)
@@ -49,7 +50,7 @@ endif()
 # Find the libraries again
 find_library(torch_lib
   NAMES ${torch_lib_name}
-  PATHS ${torch_library_path}
+  PATHS ${torch_dir}/libtorch/lib
 )
 
 if (NOT torch_lib)
