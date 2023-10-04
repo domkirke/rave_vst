@@ -37,7 +37,7 @@ jobs:
       - name: Upload build artifacts
         uses: actions/upload-artifact@v3
         with:
-          name: RAVE_VST
+          name: RAVE_VST_Ubuntu
           path: build/rave-vst_artefacts/RAVE_VST_Ubuntu.zip
 
   macos_arm64_build:
@@ -71,7 +71,7 @@ jobs:
       - name: Upload build artifacts
         uses: actions/upload-artifact@v3
         with:
-          name: RAVE_VST
+          name: RAVE_VS_macOS_arm64
           path: build/rave-vst_artefacts/RAVE_VST_MacOS_arm64.zip
 
   macos_x86_build:
@@ -104,7 +104,7 @@ jobs:
       - name: Upload build artifacts
         uses: actions/upload-artifact@v3
         with:
-          name: RAVE_VST
+          name: RAVE_VS_macOS_x86_64
           path: build/rave-vst_artefacts/RAVE_VST_MacOS_x86.zip
 
 
@@ -139,7 +139,7 @@ jobs:
       - name: Upload build artifacts
         uses: actions/upload-artifact@v3
         with:
-          name: RAVE_VST
+          name: RAVE_VS_Windows_x64
           path: build/rave-vst_artefacts/RAVE_VST_Windows_x64.tar.gz
 
   AutomaticRelease:
