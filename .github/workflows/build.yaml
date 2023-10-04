@@ -1,16 +1,9 @@
 name: Build
 
-
 on:
-  push
-#  push:
-#    branches:
-#      - main
-#  pull_request:
-#    branches:
-#      - main
-
-
+  push:
+    tags:
+      - "v*"
 jobs:
   ubuntu_build:
     runs-on: ubuntu-latest
