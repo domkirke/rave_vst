@@ -39,7 +39,7 @@ jobs:
         working-directory: build/rave-vst_artefacts
         run: |
           mv Release RAVE_VST
-          zip -r RAVE_VST/AU RAVE_VST/Standalone RAVE_VST/VST3 RAVE_VST_Ubuntu.zip
+          zip -r RAVE_VST_Ubuntu.zip RAVE_VST/AU RAVE_VST/Standalone RAVE_VST/VST3 
 
       - name: Upload build artifacts
         uses: actions/upload-artifact@v3
@@ -73,7 +73,7 @@ jobs:
         working-directory: build/rave-vst_artefacts
         run: |
           mv Release RAVE_VST
-          zip -r RAVE_VST/AU RAVE_VST/Standalone RAVE_VST/VST3 RAVE_VST_MacOS_arm64.zip
+          zip -r RAVE_VST_MacOS_arm64.zip RAVE_VST/AU RAVE_VST/Standalone RAVE_VST/VST3 
 
       - name: Upload build artifacts
         uses: actions/upload-artifact@v3
@@ -106,7 +106,7 @@ jobs:
         working-directory: build/rave-vst_artefacts
         run: |
           mv Release RAVE_VST
-          zip -r RAVE_VST/AU RAVE_VST/Standalone RAVE_VST/VST3 RAVE_VST_MacOS_x86.zip
+          zip -r RAVE_VST_MacOS_x86.zip RAVE_VST/AU RAVE_VST/Standalone RAVE_VST/VST3 
 
       - name: Upload build artifacts
         uses: actions/upload-artifact@v3
@@ -132,18 +132,22 @@ jobs:
       - name: Build
         working-directory: build
         run: cmake --build . --config Release -j 4
+
+      - name: ls
+        run: |
+          ls build/rave-vst_artefacts
         
       - name: Compress
         working-directory: build/rave-vst_artefacts
         run: |
           mv Release RAVE_VST
-          tar -czvf rave_vst_windows_x64.tar.gz RAVE_VST
+          tar -czvf RAVE_VST_Windows_x64.tar.gz RAVE_VST
 
       - name: Upload build artifacts
         uses: actions/upload-artifact@v3
         with:
           name: RAVE_VST
-          path: build/rave-vst_artefacts/RAVE_VST_Windows_x64.zip
+          path: build/rave-vst_artefacts/RAVE_VST_Windows_x64.tar.gz
 
   AutomaticRelease:
     runs-on: ubuntu-latest
