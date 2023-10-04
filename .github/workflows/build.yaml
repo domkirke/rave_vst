@@ -71,7 +71,7 @@ jobs:
       - name: Upload build artifacts
         uses: actions/upload-artifact@v3
         with:
-          name: RAVE_VS_macOS_arm64
+          name: RAVE_VST_macOS_arm64
           path: build/rave-vst_artefacts/RAVE_VST_MacOS_arm64.zip
 
   macos_x86_build:
@@ -104,7 +104,7 @@ jobs:
       - name: Upload build artifacts
         uses: actions/upload-artifact@v3
         with:
-          name: RAVE_VS_macOS_x86_64
+          name: RAVE_VST_macOS_x86_64
           path: build/rave-vst_artefacts/RAVE_VST_MacOS_x86.zip
 
 
@@ -139,7 +139,7 @@ jobs:
       - name: Upload build artifacts
         uses: actions/upload-artifact@v3
         with:
-          name: RAVE_VS_Windows_x64
+          name: RAVE_VST_Windows_x64
           path: build/rave-vst_artefacts/RAVE_VST_Windows_x64.tar.gz
 
   AutomaticRelease:
@@ -148,15 +148,17 @@ jobs:
     steps:
       - name: Download build binaries
         uses: actions/download-artifact@v2
-        with:
-          name: RAVE_VST
+      - name: 'Echo download path'
+        run: |
+          echo ${{steps.download.outputs.download-path}}
+      
       - name: Automated Release
         uses: "marvinpinto/action-automatic-releases@latest"
         with:
           repo_token: "${{ secrets.GITHUB_TOKEN }}"
           prerelease: false
           files: |
-            RAVE_VST_Ubuntu.tar.gz
-            RAVE_VST_MacOS_arm64.tar.gz
-            RAVE_VST_MacOS_x86.tar.gz
-            RAVE_VST_Windows_x64.tar.gz
+            RAVE_VST_Ubuntu/RAVE_VST_Ubuntu.tar.gz
+            RAVE_VST_MacOS_arm64/RAVE_VST_MacOS_arm64.tar.gz
+            RAVE_VST_MacOS_x86/RAVE_VST_MacOS_x86.tar.gz
+            RAVE_VST_Windows_x64/RAVE_VST_Windows_x64.tar.gz
