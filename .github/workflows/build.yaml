@@ -156,6 +156,6 @@ jobs:
           prerelease: false
           files: |
             RAVE_VST_Ubuntu/RAVE_VST_Ubuntu.zip
-            RAVE_VST_MacOS_arm64/RAVE_VST_MacOS_arm64.zip
-            RAVE_VST_MacOS_x86/RAVE_VST_MacOS_x86.zip
+            RAVE_VST_macOS_arm64/RAVE_VST_MacOS_arm64.zip
+            RAVE_VST_macOS_x86_64/RAVE_VST_MacOS_x86.zip
             RAVE_VST_Windows_x64/RAVE_VST_Windows_x64.tar.gz
