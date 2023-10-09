@@ -1,15 +1,10 @@
 set(torch_dir ${CMAKE_CURRENT_BINARY_DIR}/torch)
 set(torch_lib_name torch)
 
-if (APPLE_ARM64) 
-  set(torch_library_path ${torch_dir}/lib/python3.10/site-packages/torch/lib)
-else()
-  set(torch_library_path ${torch_dir}/libtorch/lib)
-endif()
-
+message("${torch_library_path}")
 find_library(torch_lib
   NAMES ${torch_lib_name}
-  PATHS ${torch_library_path}
+  PATHS ${torch_dir}/libtorch/lib
 )
 
 if (DEFINED torch_version)
@@ -26,7 +21,7 @@ if (NOT torch_lib)
   if (UNIX AND NOT APPLE)  # Linux
     set(torch_url
         "https://download.pytorch.org/libtorch/cpu/libtorch-cxx11-abi-shared-with-deps-${torch_version}%2Bcpu.zip")
-  elseif (UNIX AND APPLE)  # OSX
+  elseif (UNIX AND APPLE)  # OSXx
     if (APPLE_ARM64)
       set(torch_url
           "https://anaconda.org/pytorch/pytorch/${torch_version}/download/osx-arm64/pytorch-2.0.1-py3.10_0.tar.bz2")
@@ -34,6 +29,7 @@ if (NOT torch_lib)
       set(torch_url
         "https://download.pytorch.org/libtorch/cpu/libtorch-macos-${torch_version}.zip")
     endif()
+    message("ARM64 ${CMAKE_SYSTEM_PROCESSOR} detected.\n torch download link : ${torch_url}")
   else()                   # Windows
     set(torch_url
         "https://download.pytorch.org/libtorch/cpu/libtorch-win-shared-with-deps-${torch_version}%2Bcpu.zip")
@@ -48,13 +44,17 @@ if (NOT torch_lib)
                   WORKING_DIRECTORY ${torch_dir})
 
   file(REMOVE ${torch_dir}/torch_cc.zip)
+  if (APPLE_ARM64)
+    file(RENAME "${CMAKE_CURRENT_BINARY_DIR}/torch/lib/python3.10/site-packages/torch" "${CMAKE_CURRENT_BINARY_DIR}/torch/torch")
+    file(RENAME "${CMAKE_CURRENT_BINARY_DIR}/torch/torch" "${CMAKE_CURRENT_BINARY_DIR}/torch/libtorch")
+  endif()
 
 endif()
 
 # Find the libraries again
 find_library(torch_lib
   NAMES ${torch_lib_name}
-  PATHS ${torch_library_path}
+  PATHS ${torch_dir}/libtorch/lib
 )
 
 if (NOT torch_lib)
