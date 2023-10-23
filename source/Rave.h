@@ -1,7 +1,8 @@
 #pragma once
-#include <JuceHeader.h>
+
 #include <torch/script.h>
 #include <torch/torch.h>
+#include <JuceHeader.h>
 
 #define MAX_LATENT_BUFFER_SIZE 32
 #define BUFFER_LENGTH 32768
@@ -14,6 +15,7 @@ public:
     torch::jit::getProfilingMode() = false;
     c10::InferenceMode guard;
     torch::jit::setGraphExecutorOptimize(true);
+    std::cout << "RAVE object created" << std::endl;
   }
 
   void load_model(const std::string &rave_model_file) {
@@ -37,6 +39,7 @@ public:
               << std::endl;
 
     bool found_model_as_attribute = false;
+    //TODO : retro-campitability and add set_stereo_mode call for recent models
     bool found_stereo_attribute = false;
     for (auto const& attr : named_attributes) {
       if (attr.name == "_rave") {
@@ -44,9 +47,14 @@ public:
         std::cout << "Found _rave model as named attribute" << std::endl;
       }
       else if (attr.name == "stereo" || attr.name == "_rave.stereo") {
+        // retro-compatibility
         found_stereo_attribute = true;
         stereo = attr.value.toBool();
-        std::cout << "Stereo?" << (stereo ? "true" : "false") << std::endl;
+      } else if (attr.name == "stereo_mode" || attr.name == "_rave.stereo_mode") {
+        found_stereo_attribute = true;
+        stereo = true;
+        std::vector<torch::jit::IValue> set_stereo_input = {torch::tensor({{true}})};
+        this->model.get_method("set_stereo_mode")(set_stereo_input);
       }
     }
 
@@ -211,6 +219,8 @@ public:
   bool hasMethod(const std::string& method_name) const {
     return this->model.find_method(method_name).has_value();
   }
+
+  juce::String getModelPath() { return model_path; } 
 
 private:
   torch::jit::Module model;

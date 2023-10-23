@@ -1,7 +1,7 @@
 #pragma once
 #include "GUI_GLOBALS.h"
 #include <JuceHeader.h>
-using namespace juce;
+// using namespace juce;
 
 class LightLookAndFeel : public LookAndFeel_V4 {
   // White on black

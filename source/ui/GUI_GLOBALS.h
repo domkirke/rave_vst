@@ -2,7 +2,7 @@
 
 #include <JuceHeader.h>
 
-using namespace juce;
+// using namespace juce;
 
 // Globals
 static const int UI_VIZ_REFRESH_RATE = 50;

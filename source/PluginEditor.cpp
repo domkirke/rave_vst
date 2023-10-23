@@ -40,6 +40,8 @@ RaveAPEditor::RaveAPEditor(RaveAP &p, AudioProcessorValueTreeState &vts)
         _availableModelsPaths[_header._modelComboBox.indexOfItemId(
             _header._modelComboBox.getSelectedId())];
     audioProcessor.updateEngine(modelPath.toStdString());
+
+
   };
 
   _header.connectVTS(vts);
@@ -76,6 +78,7 @@ RaveAPEditor::RaveAPEditor(RaveAP &p, AudioProcessorValueTreeState &vts)
   getConstrainer()->setMinimumSize(996, 560);
   setSize(996, 560);
   // startTimer(100.);
+
 }
 
 RaveAPEditor::~RaveAPEditor() {}

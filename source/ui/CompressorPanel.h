@@ -3,7 +3,7 @@
 #include "SliderGroup.h"
 #include <JuceHeader.h>
 
-using namespace juce;
+// using namespace juce;
 
 class CompressorPanel : public juce::Component {
   typedef AudioProcessorValueTreeState::SliderAttachment SliderAttachment;

@@ -29,6 +29,7 @@ void RaveAP::modelPerform() {
       int64_t sizes = {input_size};
       at::Tensor frame = torch::from_blob(_inModel[0].get(), sizes);
       frame = torch::reshape(frame, {1, 1, input_size});
+
 #if DEBUG_PERFORM
       std::cout << "Current input size : " << frame.sizes() << std::endl;
 #endif DEBUG_PERFORM
@@ -153,20 +154,26 @@ void modelPerform_callback(RaveAP *ap) { ap->modelPerform(); }
 
 void RaveAP::processBlock(juce::AudioBuffer<float> &buffer,
                           juce::MidiBuffer & /*midiMessages*/) {
+  
+# if DEBUG_PERFORM
+  std::cout << "processing block..." << std::endl;
+# endif
   juce::ScopedNoDenormals noDenormals;
   const int nSamples = buffer.getNumSamples();
   const int nChannels = buffer.getNumChannels();
 
+
   // mute if pause
+  // TODO : this makes output muted in max, add check box to make this an option
   AudioPlayHead *playHead = this->getPlayHead();
   if (playHead != nullptr) {
-    std::cout << "has playhead! " << std::endl;
+    // std::cout << "has playhead! " << std::endl;
     AudioPlayHead::CurrentPositionInfo info;
     bool hasDawInformation = playHead->getCurrentPosition(info);
     if (hasDawInformation) {
       bool isPlaying = info.isPlaying;
       _plays = isPlaying;
-      std::cout << "plays?  " << isPlaying << std::endl;
+      // std::cout << "plays? " << isPlaying << std::endl;
       if (isPlaying && _isMuted.load()) {
         unmute();
       } else if (!isPlaying && !_isMuted.load()) {
@@ -221,6 +228,9 @@ void RaveAP::processBlock(juce::AudioBuffer<float> &buffer,
   // create processing thread
   int currentRefreshRate = pow(2, *_latencyMode);
   if (_inBuffer[0].len() >= currentRefreshRate) {
+#if DEBUG_PERFORM
+      std::cout << "buffer full..." << std::endl;
+#endif    
     if (_computeThread) {
 
 #if DEBUG_PERFORM
@@ -245,7 +255,7 @@ void RaveAP::processBlock(juce::AudioBuffer<float> &buffer,
     out_buffer.clear();
   }
 
-#if DEBUG
+#if DEBUG_PERFORM
   std::cout << "buffer out : " << out_buffer.getMagnitude(0, nSamples)
             << std::endl;
 #endif
@@ -258,12 +268,14 @@ void RaveAP::processBlock(juce::AudioBuffer<float> &buffer,
   buffer.copyFrom(0, 0, out_buffer, 0, 0, nSamples);
   if (nChannels == 2)
     buffer.copyFrom(1, 0, out_buffer, 1, 0, nSamples);
+
 #if DEBUG_PERFORM
   std::cout << "sortie : " << buffer.getMagnitude(0, nSamples) << std::endl;
 #endif
 }
 
 void RaveAP::parameterChanged(const String &parameterID, float newValue) {
+  std::cout << "hello here?" << std::endl;
   if (parameterID == rave_parameters::input_gain) {
     _inputGainEffect.setGainDecibels(newValue);
   } else if (parameterID == rave_parameters::input_ratio) {
@@ -289,11 +301,11 @@ void RaveAP::updateBufferSizes() {
   float b = validBufferSizes.getEnd();
 
   if (*_latencyMode < a) {
-    std::cout << "to low; setting rate to : " << static_cast<int>(log2(a))
+    std::cout << "too low; setting rate to : " << static_cast<int>(log2(a))
               << std::endl;
     *_latencyMode = static_cast<int>(log2(a));
   } else if (*_latencyMode > b) {
-    std::cout << "to high; setting rate to : " << static_cast<int>(log2(b))
+    std::cout << "too high; setting rate to : " << static_cast<int>(log2(b))
               << std::endl;
     *_latencyMode = static_cast<int>(log2(b));
   }

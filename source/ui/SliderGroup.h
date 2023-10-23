@@ -2,7 +2,7 @@
 #include "GUI_GLOBALS.h"
 #include <JuceHeader.h>
 
-using namespace juce;
+// using namespace juce;
 
 class SliderGroup : public juce::Component {
   typedef AudioProcessorValueTreeState::SliderAttachment SliderAttachment;

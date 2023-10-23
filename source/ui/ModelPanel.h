@@ -8,7 +8,7 @@
 #include <fstream>
 #include <iostream>
 
-using namespace juce;
+// using namespace juce;
 
 class ModelPanel : public Component, public Timer {
 

@@ -3,7 +3,7 @@
 #include <math.h>
 
 RaveAP::RaveAP()
-#ifndef JucePlugin_PreferredChannelConfigurations
+ #ifndef JucePlugin_PreferredChannelConfigurations
     : AudioProcessor(
           BusesProperties()
               .withInput("Input", juce::AudioChannelSet::stereo(), true)
@@ -11,7 +11,7 @@ RaveAP::RaveAP()
       _avts(*this, nullptr, Identifier("RAVEValueTree"),
             createParameterLayout()),
       _loadedModelName(""), _computeThread(nullptr), _dryWetMixerEffect(BUFFER_LENGTH)
-#endif
+ #endif
 {
   _inBuffer = std::make_unique<circular_buffer<float, float>[]>(1);
   _outBuffer = std::make_unique<circular_buffer<float, float>[]>(2);
@@ -98,7 +98,6 @@ juce::String valueToTextFunction(float value) {
 float textToValueFunction (const String &value) {
     return value.getFloatValue();
 }
-
 
 
 AudioProcessorValueTreeState::ParameterLayout RaveAP::createParameterLayout() {

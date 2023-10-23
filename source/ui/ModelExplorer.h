@@ -2,7 +2,7 @@
 
 #include "GUI_GLOBALS.h"
 
-using namespace juce;
+// using namespace juce;
 
 class myListBox : public ListBox {
 public:

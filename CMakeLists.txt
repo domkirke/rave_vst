@@ -105,7 +105,6 @@ target_compile_definitions(${target_name}
 # Conversion to binary-data will happen when the target is built.
 
 # juce_add_binary_data(ConsoleAppData SOURCES ...)
-
 ##### Automatically bundle libtorch into the targets
 get_target_property(active_formats ${target_name} JUCE_FORMATS)
 if (APPLE)

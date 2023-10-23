@@ -6,7 +6,7 @@
 #include <JuceHeader.h>
 #include <math.h>
 
-using namespace juce;
+// using namespace juce;
 
 class FoldablePanel : public juce::Component {
   typedef AudioProcessorValueTreeState::SliderAttachment SliderAttachment;

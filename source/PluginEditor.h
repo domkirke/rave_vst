@@ -11,7 +11,7 @@
 
 #include <JuceHeader.h>
 
-using namespace juce;
+// using namespace juce;
 
 class RaveAPEditor : public juce::AudioProcessorEditor,
                      public juce::ChangeListener,

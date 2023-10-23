@@ -1,8 +1,8 @@
 #pragma once
 
+#include "Rave.h"
 #include "CircularBuffer.h"
 #include "EngineUpdater.h"
-#include "Rave.h"
 #include <JuceHeader.h>
 #include <algorithm>
 #include <torch/script.h>

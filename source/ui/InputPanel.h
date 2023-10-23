@@ -3,7 +3,7 @@
 #include "SliderGroup.h"
 #include <JuceHeader.h>
 
-using namespace juce;
+// using namespace juce;
 
 class InputPanel : public juce::Component {
   typedef AudioProcessorValueTreeState::SliderAttachment SliderAttachment;
