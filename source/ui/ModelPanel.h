@@ -52,8 +52,10 @@ public:
     }
 
     _togglePrior.setButtonText("Use Prior");
-
     addAndMakeVisible(_togglePrior);
+
+    _toggleMuteWithPlayback.setButtonText("Mute with Playback");
+    addAndMakeVisible(_toggleMuteWithPlayback);
 
     addAndMakeVisible(_latentJitter);
     addAndMakeVisible(_width);
@@ -70,7 +72,9 @@ public:
     _latentJitter.connectVTS(vts);
     _width.connectVTS(vts);
     _togglePriorAttachment.reset(
-        new ButtonAttachment(vts, rave_parameters::use_prior, _togglePrior));
+      new ButtonAttachment(vts, rave_parameters::use_prior, _togglePrior));
+    _toggleMuteWithPlaybackAttachment.reset(
+      new ButtonAttachment(vts, rave_parameters::mute_with_playback, _toggleMuteWithPlayback));
     for (size_t i = 0; i < _latentsNbr; i++) {
       _biases[i]->connectVTS(vts);
       _scales[i]->connectVTS(vts);
@@ -101,6 +105,10 @@ public:
       _biases[i]->setBounds(b_col1Left);
       _scales[i]->setBounds(b_col1Right);
     }
+
+    auto muteOnPlayback = getLocalBounds().removeFromBottom(UI_MARGIN_SIZE * 3);
+    _toggleMuteWithPlayback.setBounds(muteOnPlayback);
+
     // Visualisation
     auto b_col2 = b_area.removeFromRight(columnWidth * 2);
     // We're removing parts of the area in order to center the circle properly
@@ -151,7 +159,7 @@ public:
   void drawPoints(Graphics &g) {
     size_t lastIdx = _pointPositions[0].size();
     for (size_t i = 0; i < _latentsNbr; i++) {
-      auto point = _pointPositions[i][lastIdx];
+      auto point = _pointPositions[i][lastIdx - 1];
       g.setColour(MAIN_COLOR);
       g.drawEllipse(point.getX() - UI_THUMB_SIZE / 2,
                     point.getY() - UI_THUMB_SIZE / 2, UI_THUMB_SIZE,
@@ -192,7 +200,7 @@ public:
              _b_innerCircleArea.getWidth(), _b_innerCircleArea.getHeight(),
              startingAngleRadians + _latentAngle, startingAngleRadians);
 
-    auto c1 = MAIN_COLOR.withAlpha(70.0f);
+    auto c1 = MAIN_COLOR.withAlpha(0.7f);
     auto c2 = MAIN_COLOR.withAlpha(0.0f);
 
     if (fill) {
@@ -351,7 +359,9 @@ private:
   std::vector<SliderGroup *> _scales;
 
   ToggleButton _togglePrior;
+  ToggleButton _toggleMuteWithPlayback;
   std::unique_ptr<ButtonAttachment> _togglePriorAttachment;
+  std::unique_ptr<ButtonAttachment> _toggleMuteWithPlaybackAttachment;
 
   JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(ModelPanel)
 };

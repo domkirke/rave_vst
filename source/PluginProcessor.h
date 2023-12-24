@@ -9,7 +9,6 @@
 #include <torch/torch.h>
 
 #define EPSILON 0.0000001
-#define DEBUG 0
 
 const size_t AVAILABLE_DIMS = 8;
 const juce::StringArray channel_modes = {"L", "R", "L + R"};
@@ -30,17 +29,18 @@ const String latent_bias{"latent_bias"};
 const String latency_mode{"latency_mode"};
 const String use_prior{"use_prior"};
 const String prior_temperature{"prior_temperature"};
+const String mute_with_playback{"mute_with_playback"};
 } // namespace rave_parameters
 
 namespace rave_ranges {
-const NormalisableRange<float> gainRange(-70.f, 12.f);
-const NormalisableRange<float> latentScaleRange(0.0f, 5.0f);
-const NormalisableRange<float> latentBiasRange(-3.0f, 3.0f);
+  const NormalisableRange<float> gainRange(-70.f, 12.f);
+  const NormalisableRange<float> latentScaleRange(0.0f, 5.0f);
+  const NormalisableRange<float> latentBiasRange(-3.0f, 3.0f);
 } // namespace rave_ranges
 
 class NAAudioParameterInt: public juce::AudioParameterInt {
   public: 
-    NAAudioParameterInt(const String &parameterID,
+    NAAudioParameterInt(const ParameterID &parameterID,
                         const String &parameterName,
                         int minValue, int maxValue, 
                         int defaultValue, const String &parameterLabel=String(), 
@@ -143,6 +143,7 @@ private:
   std::atomic<float> *_latencyMode;
   std::atomic<float> *_usePrior;
   std::atomic<float> *_priorTemperature;
+  std::atomic<float> *_muteWithPlayback;
 
   std::array<std::atomic<float> *, AVAILABLE_DIMS> *_latentScale;
   std::array<std::atomic<float> *, AVAILABLE_DIMS> *_latentBias;

@@ -1,9 +1,10 @@
 #include "PluginProcessor.h"
 #include "PluginEditor.h"
 #include <math.h>
+#define JUCE_FORCE_USE_LEGACY_PARAM_IDS
 
 RaveAP::RaveAP()
- #ifndef JucePlugin_PreferredChannelConfigurations
+//  #ifndef JucePlugin_PreferredChannelConfigurations
     : AudioProcessor(
           BusesProperties()
               .withInput("Input", juce::AudioChannelSet::stereo(), true)
@@ -11,7 +12,7 @@ RaveAP::RaveAP()
       _avts(*this, nullptr, Identifier("RAVEValueTree"),
             createParameterLayout()),
       _loadedModelName(""), _computeThread(nullptr), _dryWetMixerEffect(BUFFER_LENGTH)
- #endif
+//  #endif
 {
   _inBuffer = std::make_unique<circular_buffer<float, float>[]>(1);
   _outBuffer = std::make_unique<circular_buffer<float, float>[]>(2);
@@ -30,6 +31,8 @@ RaveAP::RaveAP()
   _dryWetValue = _avts.getRawParameterValue(rave_parameters::output_drywet);
   _limitValue = _avts.getRawParameterValue(rave_parameters::output_limit);
   _usePrior = _avts.getRawParameterValue(rave_parameters::use_prior);
+  _muteWithPlayback = _avts.getRawParameterValue(rave_parameters::mute_with_playback);
+
   _latentScale = new std::array<std::atomic<float> *, AVAILABLE_DIMS>;
   _latentBias = new std::array<std::atomic<float> *, AVAILABLE_DIMS>;
   for (unsigned long i = 0; i < AVAILABLE_DIMS; i++) {
@@ -103,48 +106,52 @@ float textToValueFunction (const String &value) {
 AudioProcessorValueTreeState::ParameterLayout RaveAP::createParameterLayout() {
   std::vector<std::unique_ptr<RangedAudioParameter>> params;
   params.push_back(std::make_unique<AudioParameterFloat>(
-      rave_parameters::input_gain, rave_parameters::input_gain,
+      ParameterID(rave_parameters::input_gain, 1), rave_parameters::input_gain,
       rave_ranges::gainRange, 0.f));
   params.push_back(std::make_unique<AudioParameterFloat>(
-      rave_parameters::input_thresh, rave_parameters::input_thresh, -60.f, 0.f,
+      ParameterID(rave_parameters::input_thresh, 2), rave_parameters::input_thresh, -60.f, 0.f,
       0.f));
   params.push_back(std::make_unique<AudioParameterFloat>(
-      rave_parameters::input_ratio, rave_parameters::input_ratio, 1.f, 10.f,
+      ParameterID(rave_parameters::input_ratio, 3), rave_parameters::input_ratio, 1.f, 10.f,
       1.f));
   params.push_back(std::make_unique<AudioParameterInt>(
-      rave_parameters::channel_mode, rave_parameters::channel_mode, 1, 3, 1));
+      ParameterID(rave_parameters::channel_mode, 4), rave_parameters::channel_mode, 1, 3, 1));
   params.push_back(std::make_unique<AudioParameterFloat>(
-      rave_parameters::latent_jitter, rave_parameters::latent_jitter, 0.f, 3.f,
+      ParameterID(rave_parameters::latent_jitter, 5), rave_parameters::latent_jitter, 0.f, 3.f,
       0.f));
   params.push_back(std::make_unique<AudioParameterFloat>(
-      rave_parameters::output_width, rave_parameters::output_width, 0.f, 200.f,
+      ParameterID(rave_parameters::output_width, 6), rave_parameters::output_width, 0.f, 200.f,
       100.f));
   params.push_back(std::make_unique<AudioParameterFloat>(
-      rave_parameters::output_gain, rave_parameters::output_gain,
+      ParameterID(rave_parameters::output_gain, 7), rave_parameters::output_gain,
       rave_ranges::gainRange, 0.f));
   params.push_back(std::make_unique<AudioParameterFloat>(
-      rave_parameters::output_drywet, rave_parameters::output_drywet, 0.f,
+      ParameterID(rave_parameters::output_drywet, 8), rave_parameters::output_drywet, 0.f,
       100.f, 100.f));
   params.push_back(std::make_unique<AudioParameterBool>(
-      rave_parameters::output_limit, rave_parameters::output_limit, true));
+      ParameterID(rave_parameters::output_limit, 9), rave_parameters::output_limit, true));
   params.push_back(std::make_unique<NAAudioParameterInt>(
-      rave_parameters::latency_mode, rave_parameters::latency_mode, 9, 15, 13));
+      ParameterID(rave_parameters::latency_mode, 10), rave_parameters::latency_mode, 9, 15, 13));
   params.push_back(std::make_unique<AudioParameterBool>(
-      rave_parameters::use_prior, rave_parameters::use_prior, false));
+      ParameterID(rave_parameters::use_prior, 11), rave_parameters::use_prior, false));
   params.push_back(std::make_unique<AudioParameterFloat>(
-      rave_parameters::prior_temperature, rave_parameters::prior_temperature,
-      0.f, 5.f, 1.f));
+      ParameterID(rave_parameters::prior_temperature, 12), rave_parameters::prior_temperature,
+      0.f, 5.f, 1.f
+   ));
+  params.push_back(std::make_unique<AudioParameterBool>(
+      ParameterID(rave_parameters::mute_with_playback, 13), rave_parameters::mute_with_playback, true
+  ));
 
   String current_name;
   for (size_t i = 0; i < AVAILABLE_DIMS; i++) {
     current_name =
         rave_parameters::latent_scale + String("_") + std::to_string(i);
     params.push_back(std::make_unique<AudioParameterFloat>(
-        current_name, current_name, rave_ranges::latentScaleRange, 1.0));
+        ParameterID(current_name, 20 + i * 2), current_name, rave_ranges::latentScaleRange, 1.0));
     current_name =
         rave_parameters::latent_bias + String("_") + std::to_string(i);
     params.push_back(std::make_unique<AudioParameterFloat>(
-        current_name, current_name, rave_ranges::latentBiasRange, 0.0));
+        ParameterID(current_name, 20 + i * 2 + 1), current_name, rave_ranges::latentBiasRange, 0.0));
   }
   return {params.begin(), params.end()};
 }

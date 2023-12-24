@@ -164,10 +164,9 @@ void RaveAP::processBlock(juce::AudioBuffer<float> &buffer,
 
 
   // mute if pause
-  // TODO : this makes output muted in max, add check box to make this an option
   AudioPlayHead *playHead = this->getPlayHead();
-  if (playHead != nullptr) {
-    // std::cout << "has playhead! " << std::endl;
+  bool muteWithPlayback = (bool)(_muteWithPlayback->load());
+  if ((playHead != nullptr) && (muteWithPlayback)) {
     AudioPlayHead::CurrentPositionInfo info;
     bool hasDawInformation = playHead->getCurrentPosition(info);
     if (hasDawInformation) {

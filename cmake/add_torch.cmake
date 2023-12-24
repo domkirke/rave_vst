@@ -10,21 +10,23 @@ find_library(torch_lib
 if (DEFINED torch_version)
   message("setting torch version : ${torch_version}")
 else()
-  set(torch_version "2.0.1")
+  set(torch_version "2.1.0")
   message("torch version : ${torch_version}")
 endif()
 
 if (NOT torch_lib)
   message(STATUS "Downloading torch C API pre-built")
 
+
   # Download
   if (UNIX AND NOT APPLE)  # Linux
     set(torch_url
         "https://download.pytorch.org/libtorch/cpu/libtorch-cxx11-abi-shared-with-deps-${torch_version}%2Bcpu.zip")
   elseif (UNIX AND APPLE)  # OSXx
+    set (APPLE_ARM64 (CMAKE_SYSTEM_PROCESSOR STREQUAL "arm64"))
     if (APPLE_ARM64)
       set(torch_url
-          "https://anaconda.org/pytorch/pytorch/${torch_version}/download/osx-arm64/pytorch-2.0.1-py3.10_0.tar.bz2")
+          "https://anaconda.org/pytorch/pytorch/${torch_version}/download/osx-arm64/pytorch-${torch_version}-py3.10_0.tar.bz2")
     else()
       set(torch_url
         "https://download.pytorch.org/libtorch/cpu/libtorch-macos-${torch_version}.zip")

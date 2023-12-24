@@ -1,4 +1,4 @@
-target_sources(${target_name} PRIVATE
+target_sources(${PROJECT_NAME} PRIVATE
     PluginEditor.cpp
     PluginEditorNetworking.cpp
     PluginProcessor.cpp

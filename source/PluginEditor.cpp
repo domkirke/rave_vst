@@ -81,7 +81,9 @@ RaveAPEditor::RaveAPEditor(RaveAP &p, AudioProcessorValueTreeState &vts)
 
 }
 
-RaveAPEditor::~RaveAPEditor() {}
+RaveAPEditor::~RaveAPEditor() {
+  this->audioProcessor._rave->removeChangeListener(this);
+}
 
 void RaveAPEditor::importModel() {
   _fc.reset(new FileChooser(
