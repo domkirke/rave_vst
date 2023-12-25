@@ -2,14 +2,18 @@ cmake_minimum_required(VERSION 3.22)
 
 ### Declare project ###
 project(rave-vst VERSION 0.0.2)
-if (APPLE)
-  add_link_options("-Wl,-weak_reference_mismatches,weak")
-endif()
+list(APPEND CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/cmake")
+
 
 ### Set up build type ###
 if(NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE "Release")
 endif()
+
+### Import compiler settings ###
+include(compiler_settings)
+setup_compilers()
+
 
 ### Dependency versions ###
 set(LIB_JUCE_TAG "7.0.8")
@@ -37,10 +41,8 @@ FetchContent_Declare(juce
 FetchContent_MakeAvailable(juce)
 
 ### PyTorch related content ###
-list(APPEND CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/cmake")
 include(add_torch)
 list(APPEND CMAKE_PREFIX_PATH "${torch_dir}/libtorch")
-list(APPEND CMAKE_PREFIX_PATH "${torch_dir}-x86/libtorch")
 find_package(Torch REQUIRED)
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${TORCH_CXX_FLAGS}")
 
