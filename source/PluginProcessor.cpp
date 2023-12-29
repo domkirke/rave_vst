@@ -4,15 +4,15 @@
 #define JUCE_FORCE_USE_LEGACY_PARAM_IDS
 
 RaveAP::RaveAP()
-//  #ifndef JucePlugin_PreferredChannelConfigurations
+    #ifndef JucePlugin_PreferredChannelConfigurations
     : AudioProcessor(
           BusesProperties()
               .withInput("Input", juce::AudioChannelSet::stereo(), true)
               .withOutput("Output", juce::AudioChannelSet::stereo(), true)),
+    #endif
       _avts(*this, nullptr, Identifier("RAVEValueTree"),
             createParameterLayout()),
-      _loadedModelName(""), _computeThread(nullptr), _dryWetMixerEffect(BUFFER_LENGTH)
-//  #endif
+      _loadedModelName(""), _computeThread(nullptr), _dryWetMixerEffect(BUFFER_LENGTH), _latencyState()
 {
   _inBuffer = std::make_unique<circular_buffer<float, float>[]>(1);
   _outBuffer = std::make_unique<circular_buffer<float, float>[]>(2);
@@ -131,7 +131,7 @@ AudioProcessorValueTreeState::ParameterLayout RaveAP::createParameterLayout() {
   params.push_back(std::make_unique<AudioParameterBool>(
       ParameterID(rave_parameters::output_limit, 9), rave_parameters::output_limit, true));
   params.push_back(std::make_unique<NAAudioParameterInt>(
-      ParameterID(rave_parameters::latency_mode, 10), rave_parameters::latency_mode, 9, 15, 13));
+      ParameterID(rave_parameters::latency_mode, 10), rave_parameters::latency_mode, 9, 14, 12));
   params.push_back(std::make_unique<AudioParameterBool>(
       ParameterID(rave_parameters::use_prior, 11), rave_parameters::use_prior, false));
   params.push_back(std::make_unique<AudioParameterFloat>(

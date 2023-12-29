@@ -21,7 +21,7 @@ void RaveAP::modelPerform() {
     std::cout << "temperature : " << *_priorTemperature << std::endl;
 #endif
 
-    if (_rave->hasPrior() && *_usePrior) {
+    if (_rave->hasPrior() && * _usePrior) {
       auto n_trajs = pow(2, *_latencyMode) / _rave->getModelRatio();
       latent_traj = _rave->sample_prior((int)n_trajs, *_priorTemperature);
       latent_traj_mean = latent_traj;
@@ -144,6 +144,12 @@ void RaveAP::modelPerform() {
       _outModel[0][i] = outputDataPtrL[i];
       _outModel[1][i] = outputDataPtrR[i];
     }
+    
+    // Stop recording latency in case
+    if (_latencyState.status() == RAVELatencyStateStatus::pending) {
+      _latencyState.endTimer();
+      updateLatency();
+    }
     if (_smoothedFadeInOut.getCurrentValue() < EPSILON) {
       _isMuted.store(true);
     }
@@ -158,6 +164,8 @@ void RaveAP::processBlock(juce::AudioBuffer<float> &buffer,
 # if DEBUG_PERFORM
   std::cout << "processing block..." << std::endl;
 # endif
+
+
   juce::ScopedNoDenormals noDenormals;
   const int nSamples = buffer.getNumSamples();
   const int nChannels = buffer.getNumChannels();
@@ -165,14 +173,12 @@ void RaveAP::processBlock(juce::AudioBuffer<float> &buffer,
 
   // mute if pause
   AudioPlayHead *playHead = this->getPlayHead();
-  bool muteWithPlayback = (bool)(_muteWithPlayback->load());
-  if ((playHead != nullptr) && (muteWithPlayback)) {
+  if ((playHead != nullptr) && (bool)(_muteWithPlayback->load())) {
     AudioPlayHead::CurrentPositionInfo info;
     bool hasDawInformation = playHead->getCurrentPosition(info);
     if (hasDawInformation) {
       bool isPlaying = info.isPlaying;
       _plays = isPlaying;
-      // std::cout << "plays? " << isPlaying << std::endl;
       if (isPlaying && _isMuted.load()) {
         unmute();
       } else if (!isPlaying && !_isMuted.load()) {
@@ -236,6 +242,13 @@ void RaveAP::processBlock(juce::AudioBuffer<float> &buffer,
       std::cout << "joining..." << std::endl;
 #endif
 
+      // record computing latency
+      if (_latencyState.status() == RAVELatencyStateStatus::requested) {
+        _latencyState.startTimer();
+        #if DEBUG_PERFORM
+        std::cout << "timer started ..." << std::endl;
+        #endif
+      }
       _computeThread->join();
     }
     _inBuffer[0].get(_inModel[0].get(), currentRefreshRate);
@@ -274,7 +287,6 @@ void RaveAP::processBlock(juce::AudioBuffer<float> &buffer,
 }
 
 void RaveAP::parameterChanged(const String &parameterID, float newValue) {
-  std::cout << "hello here?" << std::endl;
   if (parameterID == rave_parameters::input_gain) {
     _inputGainEffect.setGainDecibels(newValue);
   } else if (parameterID == rave_parameters::input_ratio) {
@@ -286,11 +298,9 @@ void RaveAP::parameterChanged(const String &parameterID, float newValue) {
   } else if (parameterID == rave_parameters::output_drywet) {
     _dryWetMixerEffect.setWetMixProportion(newValue / 100.f);
   } else if (parameterID == rave_parameters::latency_mode) {
-    auto latency_samples = pow(2, *_latencyMode);
-    std::cout << "[ ] - latency has changed to " << latency_samples
-              << std::endl;
-    setLatencySamples(latency_samples);
-    _dryWetMixerEffect.setWetLatency(latency_samples);
+    _inBuffer.get()->reset();
+    _latencyState.setRequested();
+    // setLatencySamples((int)latency_samples);
   }
 }
 
@@ -318,6 +328,5 @@ void RaveAP::updateEngine(const std::string modelFile) {
   if (_engineThreadPool) {
     _engineThreadPool->removeAllJobs(true, 100);
   }
-
   _engineThreadPool->addJob(new UpdateEngineJob(*this, modelFile), true);
 }

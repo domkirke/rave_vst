@@ -28,6 +28,7 @@ auto UpdateEngineJob::runJob() -> JobStatus {
 
   mProcessor._rave->load_model(mModelFile);
   mProcessor.updateBufferSizes();
+  mProcessor.getLatencyState().setRequested();
   mProcessor.unmute();
 
   DBG("Job finished");

@@ -51,6 +51,7 @@ if (NOT torch_lib)
       download_library("https://download.pytorch.org/libtorch/cpu/libtorch-macos-${torch_version}.zip" ${torch_dir}-x86)
       # export UB libs to main path
       execute_process(COMMAND find ${torch_dir}/libtorch/lib -maxdepth 1 -type f -execdir lipo -create ${torch_dir}/libtorch/lib/{} ${torch_dir}-x86/libtorch/lib/{} -output ${torch_dir}/libtorch/lib/{} \;)
+      execute_process(COMMAND cp ${torch_dir}-x86/libtorch/lib/libiomp5.dylib ${torch_dir}/libtorch/lib)
       execute_process(COMMAND rm -rf ${torch_dir}-x86)
       file(REMOVE ${torch_dir}-x86)
     else()

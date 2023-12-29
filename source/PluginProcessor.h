@@ -32,11 +32,77 @@ const String prior_temperature{"prior_temperature"};
 const String mute_with_playback{"mute_with_playback"};
 } // namespace rave_parameters
 
+
 namespace rave_ranges {
   const NormalisableRange<float> gainRange(-70.f, 12.f);
   const NormalisableRange<float> latentScaleRange(0.0f, 5.0f);
   const NormalisableRange<float> latentBiasRange(-3.0f, 3.0f);
 } // namespace rave_ranges
+
+
+// Automatic latency handling
+
+enum class RAVELatencyStateStatus: int { empty = 0, pending = 1, completed = 2, requested = 3 };
+
+class RAVELatencyState {
+  public: 
+    RAVELatencyState() {
+      _latencyTime = 0.;
+      _status = RAVELatencyStateStatus::empty;
+    }
+
+    RAVELatencyStateStatus status() const {
+      return _status;
+    }
+
+    void setRequested() {
+      _status = RAVELatencyStateStatus::requested;
+    }
+
+    void setEmpty() { 
+      _latencyTime = 0.;
+      _status = RAVELatencyStateStatus::empty; 
+    }
+
+    void startTimer() { 
+      if (_status == RAVELatencyStateStatus::requested) {
+        _latencyTime = 0.;
+        _status = RAVELatencyStateStatus::pending;
+        _start_point = std::chrono::steady_clock::now();
+      } else {
+        throw std::runtime_error("timer started, but latency updated is not requested");
+      }
+    }
+
+    void endTimer() {
+      if (_status == RAVELatencyStateStatus::pending) {
+        _latencyTime = 0.;
+        _status = RAVELatencyStateStatus::completed;
+        auto _end_point = std::chrono::steady_clock::now();
+        const std::chrono::duration<double> diff{_end_point - _start_point};
+        _latencyTime = diff.count();
+
+      } else {
+        throw std::runtime_error("timer ended, but status is not pending");
+      }
+    }
+
+    int getLatencySamples (double sample_rate) {
+      if (_status == RAVELatencyStateStatus::completed) {
+        return (int)std::ceil(_latencyTime * sample_rate);
+      }
+      else
+      {
+        throw std::runtime_error("asked for latency samples, but status is not completed");
+      }
+    }
+
+  private:
+    double _latencyTime;
+    std::chrono::time_point<std::chrono::steady_clock> _start_point;
+    RAVELatencyStateStatus _status;
+};
+
 
 class NAAudioParameterInt: public juce::AudioParameterInt {
   public: 
@@ -95,6 +161,21 @@ public:
   auto unmute() -> void;
   auto getIsMuted() -> const bool;
   void updateBufferSizes();
+  RAVELatencyState& getLatencyState() { return _latencyState; }
+  void updateLatency() {
+    if (_latencyState.status() == RAVELatencyStateStatus::completed) {
+      int processing_latency = _latencyState.getLatencySamples(getSampleRate());
+      int full_latency = processing_latency + (int)pow(2, *_latencyMode);
+      setLatencySamples(full_latency);
+      std::cout << "latency set to " << full_latency << std::endl; 
+    } else {
+      throw std::runtime_error("Got update latency, but latency chrono status is not completed.");
+    }
+  }
+  void setLatencySamples(int samples) {
+    AudioProcessor::setLatencySamples(samples);
+    _dryWetMixerEffect.setWetLatency(samples);
+  };
 
   void updateEngine(const std::string modelFile);
   std::string capitalizeFirstLetter(std::string text);
@@ -114,11 +195,13 @@ private:
   juce::AudioProcessorValueTreeState _avts;
   std::unique_ptr<juce::ThreadPool> _engineThreadPool;
   std::string _loadedModelName;
+  RAVELatencyState _latencyState;
+
 
   /*
    *Allocate some memory to use as the circular_buffer storage
    *for each of the circular_buffer types to be created
-   */
+  */
   double _sampleRate = 0;
   std::unique_ptr<circular_buffer<float, float>[]> _inBuffer;
   std::unique_ptr<circular_buffer<float, float>[]> _outBuffer;

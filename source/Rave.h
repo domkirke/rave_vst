@@ -186,15 +186,15 @@ public:
     return (unsigned int)tmp;
   }
 
-  int getModelRatio() { return encode_params.index({3}).item<int>(); }
+  int getModelRatio () { return encode_params.index({3}).item<int>(); }
 
-  float zPerSeconds() { return encode_params.index({3}).item<float>() / sr; }
+  float zPerSeconds  () { return encode_params.index({3}).item<float>() / (float)sr; }
 
-  int getFullLatentDimensions() { return latent_size; }
+  int getFullLatentDimensions  () { return latent_size; }
 
-  int getInputBatches() { return encode_params.index({1}).item<int>(); }
+  int getInputBatches () { return encode_params.index({1}).item<int>(); }
 
-  int getOutputBatches() { return decode_params.index({3}).item<int>(); }
+  int getOutputBatches () { return decode_params.index({3}).item<int>(); }
 
   void resetLatentBuffer() { latent_buffer = torch::zeros({0}); }
 

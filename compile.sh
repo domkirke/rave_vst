@@ -35,11 +35,12 @@ if [ $build -eq 1 ]; then
     cd build
     cmake .. -DCMAKE_BUILD_TYPE=${CONFIG} -DCMAKE_OSX_ARCHITECTURES=x86_64\;arm64
     cmake --build . --config ${CONFIG} -j 4
-fi
 
-if [[ "$OSTYPE" =~ ^darwin* ]]
-then
-  codesign -f --timestamp -s - build/rave-vst_artefacts/${CONFIG}/AU/RAVE.component/Contents/MacOS/RAVE
-  codesign -f --timestamp -s - build/rave-vst_artefacts/${CONFIG}/VST3/RAVE.vst3/Contents/MacOS/RAVE
-  codesign -f --timestamp -s - build/rave-vst_artefacts/${CONFIG}/Standalone/RAVE.app/Contents/MacOS/RAVE
+  if [[ "$OSTYPE" =~ ^darwin* ]]; then
+    # codesign locally #
+    codesign -f --timestamp -s - rave-vst_artefacts/${CONFIG}/AU/RAVE.component/Contents/MacOS/RAVE
+    codesign -f --timestamp -s - rave-vst_artefacts/${CONFIG}/VST3/RAVE.vst3/Contents/MacOS/RAVE
+    codesign -f --timestamp -s - rave-vst_artefacts/${CONFIG}/Standalone/RAVE.app/Contents/MacOS/RAVE
+  fi
+
 fi

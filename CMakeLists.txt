@@ -22,6 +22,8 @@ set(LIB_JUCE_TAG "7.0.8")
 # Xcode: Disable automatic build scheme generation globally.
 #        Instead, we explicitely specify which targets require schemes.
 set(CMAKE_XCODE_GENERATE_SCHEME OFF)
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+
 # IDEs:  Enable grouping of source files into folders in IDEs.
 set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 # IDEs:  Create a folder in the IDE with the JUCE Module code.
@@ -133,6 +135,7 @@ set(libtorch_files
     "${TORCH_INSTALL_PREFIX}/lib/libtorch.dylib"
     "${TORCH_INSTALL_PREFIX}/lib/libtorch_cpu.dylib"
     "${TORCH_INSTALL_PREFIX}/lib/libc10.dylib"
+    "${TORCH_INSTALL_PREFIX}/lib/libiomp5.dylib"
 )
 target_include_directories(${PROJECT_NAME} PUBLIC ${TORCH_INSTALL_PREFIX}/include/torch/*.h)
 
