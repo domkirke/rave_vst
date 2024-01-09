@@ -90,7 +90,7 @@ public:
     if (_latencyState.status() == RAVELatencyStateStatus::completed) {
       int processing_latency = _latencyState.getLatencySamples(getSampleRate());
       int full_latency = processing_latency + (int)pow(2, *_latencyMode);
-      // setLatencySamples(full_latency);
+      setLatencySamples(full_latency);
       std::cout << "latency set to " << full_latency << std::endl; 
     } else {
       throw std::runtime_error("Got update latency, but latency chrono status is not completed.");
