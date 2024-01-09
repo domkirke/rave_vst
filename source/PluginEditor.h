@@ -1,5 +1,4 @@
 #pragma once
-
 #include "PluginProcessor.h"
 #include "ui/FoldablePanel.h"
 #include "ui/GUI_GLOBALS.h"
@@ -24,26 +23,25 @@ public:
   void resized() override;
   void log(String str);
   void changeListenerCallback(ChangeBroadcaster *source) override;
+  void downloadModel(const int apiModelIdx);
+  ModelExplorer& getModelExplorer() {return _modelExplorer; };
 
   void finished(URL::DownloadTask *task, bool success) override;
   void progress(URL::DownloadTask *task, int64 bytesDownloaded,
                 int64 totalLength) override;
 
 private:
-  void getAvailableModelsFromAPI();
-  void downloadModelFromAPI();
-  String getCleanedString(String str);
-  void detectAvailableModels();
   void importModel();
-  String getApiRoot();
-
-  File _modelsDirPath;
   std::unique_ptr<FileChooser> _fc;
+  void updateModelExplorer();
+  void updateModelComboList();
 
   LightLookAndFeel _lightLookAndFeel;
   DarkLookAndFeel _darkLookAndFeel;
   RaveAP &audioProcessor;
   AudioProcessorValueTreeState &_avts;
+  mutable CriticalSection _modelDownloadMutex;
+  std::unique_ptr<juce::ThreadPool> _modelDownloadPool;
 
   // Main window
   ModelPanel _modelPanel;
@@ -54,13 +52,6 @@ private:
   Label _console;
 
   Image _bgFull;
-
-  StringArray _availableModelsPaths;
-  StringArray _availableModels;
-
-  juce::var _parsedJson;
-
-  String _apiRoot;
 
   static size_t WriteCallback(void *contents, size_t size, size_t nmemb,
                               void *userp) {
@@ -76,3 +67,5 @@ private:
 
   JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(RaveAPEditor)
 };
+
+#include "ModelDownload.h"

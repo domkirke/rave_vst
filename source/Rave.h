@@ -39,7 +39,6 @@ public:
               << std::endl;
 
     bool found_model_as_attribute = false;
-    //TODO : retro-campitability and add set_stereo_mode call for recent models
     bool found_stereo_attribute = false;
     for (auto const& attr : named_attributes) {
       if (attr.name == "_rave") {
@@ -122,12 +121,16 @@ public:
     std::cout << "\tFull latent size: " << getFullLatentDimensions()
               << std::endl;
     std::cout << "\tRatio: " << getModelRatio() << std::endl;
+    std::cout << "\tHas prior : " << hasPrior() << std::endl;
     c10::InferenceMode guard;
     inputs_rave.clear();
     inputs_rave.push_back(torch::ones({1, 1, getModelRatio()}));
+    has_model = true;
     resetLatentBuffer();
     sendChangeMessage();
   }
+
+  bool hasModel() { return has_model; }
 
   torch::Tensor sample_prior(const int n_steps, const float temperature) {
     c10::InferenceMode guard;
@@ -210,7 +213,9 @@ public:
     }
   }
 
-  bool hasPrior() { return has_prior; }
+  bool hasPrior() { 
+    return has_prior; 
+  }
 
   bool isStereo() const { return stereo; }
 
@@ -226,6 +231,7 @@ private:
   torch::jit::Module model;
   int sr;
   int latent_size;
+  bool has_model = false;
   bool has_prior = false;
   bool stereo = false;
   juce::String model_path;

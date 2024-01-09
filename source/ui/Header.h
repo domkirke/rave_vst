@@ -51,7 +51,7 @@ public:
         b_area.removeFromRight(columnWidth * 2 + UI_MARGIN_SIZE));
   }
 
-  void paint(juce::Graphics & /*g*/) {}
+  void paint(juce::Graphics & /*g*/) override {}
 
   // Needs to be public, as the model manager click is handled by the Editor
   // And the comboBox is refreshed by the editor after the download

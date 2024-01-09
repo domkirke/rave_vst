@@ -1,20 +1,23 @@
 #pragma once
 
 #include "Rave.h"
+#include "helpers.h"
 #include "CircularBuffer.h"
 #include "EngineUpdater.h"
 #include <JuceHeader.h>
 #include <algorithm>
 #include <torch/script.h>
 #include <torch/torch.h>
+#include <sys/stat.h>
 
 #define EPSILON 0.0000001
 
 const size_t AVAILABLE_DIMS = 8;
+const String NO_MODEL_STRING = "";
 const juce::StringArray channel_modes = {"L", "R", "L + R"};
 
 namespace rave_parameters {
-const String model_selection{"model_selection"};
+const String current_model{"current_model"};
 const String input_gain{"input_gain"};
 const String channel_mode{"channel_mode"};
 const String input_thresh{"input_threshold"};
@@ -40,85 +43,6 @@ namespace rave_ranges {
 } // namespace rave_ranges
 
 
-// Automatic latency handling
-
-enum class RAVELatencyStateStatus: int { empty = 0, pending = 1, completed = 2, requested = 3 };
-
-class RAVELatencyState {
-  public: 
-    RAVELatencyState() {
-      _latencyTime = 0.;
-      _status = RAVELatencyStateStatus::empty;
-    }
-
-    RAVELatencyStateStatus status() const {
-      return _status;
-    }
-
-    void setRequested() {
-      _status = RAVELatencyStateStatus::requested;
-    }
-
-    void setEmpty() { 
-      _latencyTime = 0.;
-      _status = RAVELatencyStateStatus::empty; 
-    }
-
-    void startTimer() { 
-      if (_status == RAVELatencyStateStatus::requested) {
-        _latencyTime = 0.;
-        _status = RAVELatencyStateStatus::pending;
-        _start_point = std::chrono::steady_clock::now();
-      } else {
-        throw std::runtime_error("timer started, but latency updated is not requested");
-      }
-    }
-
-    void endTimer() {
-      if (_status == RAVELatencyStateStatus::pending) {
-        _latencyTime = 0.;
-        _status = RAVELatencyStateStatus::completed;
-        auto _end_point = std::chrono::steady_clock::now();
-        const std::chrono::duration<double> diff{_end_point - _start_point};
-        _latencyTime = diff.count();
-
-      } else {
-        throw std::runtime_error("timer ended, but status is not pending");
-      }
-    }
-
-    int getLatencySamples (double sample_rate) {
-      if (_status == RAVELatencyStateStatus::completed) {
-        return (int)std::ceil(_latencyTime * sample_rate);
-      }
-      else
-      {
-        throw std::runtime_error("asked for latency samples, but status is not completed");
-      }
-    }
-
-  private:
-    double _latencyTime;
-    std::chrono::time_point<std::chrono::steady_clock> _start_point;
-    RAVELatencyStateStatus _status;
-};
-
-
-class NAAudioParameterInt: public juce::AudioParameterInt {
-  public: 
-    NAAudioParameterInt(const ParameterID &parameterID,
-                        const String &parameterName,
-                        int minValue, int maxValue, 
-                        int defaultValue, const String &parameterLabel=String(), 
-                        std::function< String(int value, int maximumStringLength)> stringFromInt=nullptr,
-                        std::function< int(const String &text)> intFromString=nullptr): 
-                        juce::AudioParameterInt(parameterID, parameterName, minValue, maxValue, defaultValue, parameterLabel, stringFromInt, intFromString)  
-    {}
-
-    bool isAutomatable() const override { return false; }
-};
-
-
 class RaveAP : public juce::AudioProcessor,
                public juce::AudioProcessorValueTreeState::Listener {
   // WARNING: As we do not implement processBlock() without parameters like in:
@@ -139,7 +63,6 @@ public:
 #endif
   void processBlock(juce::AudioBuffer<float> &, juce::MidiBuffer &) override;
   void modelPerform();
-  void detectAvailableModels();
   juce::AudioProcessorEditor *createEditor() override;
   bool hasEditor() const override;
   const juce::String getName() const override;
@@ -152,7 +75,8 @@ public:
   void setCurrentProgram(int index) override;
   const juce::String getProgramName(int index) override;
   void changeProgramName(int index, const juce::String &newName) override;
-  AudioProcessorValueTreeState::ParameterLayout createParameterLayout();
+  AudioProcessorValueTreeState::ParameterLayout createParameterLayout(); 
+  AudioProcessorValueTreeState::ParameterLayout createParameterLayout(const StringArray modelNamesList);
   void getStateInformation(juce::MemoryBlock &destData) override;
   void setStateInformation(const void *data, int sizeInBytes) override;
   void parameterChanged(const String &parameterID, float newValue) override;
@@ -166,43 +90,75 @@ public:
     if (_latencyState.status() == RAVELatencyStateStatus::completed) {
       int processing_latency = _latencyState.getLatencySamples(getSampleRate());
       int full_latency = processing_latency + (int)pow(2, *_latencyMode);
-      setLatencySamples(full_latency);
+      // setLatencySamples(full_latency);
       std::cout << "latency set to " << full_latency << std::endl; 
     } else {
       throw std::runtime_error("Got update latency, but latency chrono status is not completed.");
     }
   }
+
   void setLatencySamples(int samples) {
     AudioProcessor::setLatencySamples(samples);
-    _dryWetMixerEffect.setWetLatency(samples);
-  };
+    _dryWetMixerEffect.setWetLatency(static_cast<float>(samples));
+  }
 
-  void updateEngine(const std::string modelFile);
   std::string capitalizeFirstLetter(std::string text);
   float getAmplitude(float *buffer, size_t len);
 
   std::unique_ptr<RAVE> _rave;
+  // getter functions for models
+  String getModelsDirPath() const {return _modelsDirPath; }
+  StringArray getAvailableModels() {return std::get<0>(_availableModels); }
+  StringArray getAvailableModelsPath() {return std::get<1>(_availableModels); }
+  String getPathFromModel(String model);
+  // update functions for models
+  void updateModelsDirPath();
+  void updateAvailableModels();
+  void updateAvailableModelsFromAPI();
+  std::tuple<URL, File> getFileForDownload(int apiModelIdx);
+  std::vector<std::tuple<String, DynamicObject, NamedValueSet>> getAvailableModelsFromAPI() const;
+  void loadModel(String modelName);
+  bool isModelAvailable() const {return _isModelAvailable;}; // For a special case when model is not present but loaded in AVTS
+  int getCurrentModelIdx() {
+    return getAvailableModels().indexOf(_loadedModelName);
+  }
+  String getCurrentModelName() const {return _loadedModelName; }
+  juce::String getApiRoot();
+
   float _inputAmplitudeL;
   float _inputAmplitudeR;
   float _outputAmplitudeL;
   float _outputAmplitudeR;
   bool _plays = false; 
 
-  double getSampleRate() { return _sampleRate; }
+  double getSampleRate() const { return _sampleRate; }
 
 private:
   mutable CriticalSection _engineUpdateMutex;
   juce::AudioProcessorValueTreeState _avts;
   std::unique_ptr<juce::ThreadPool> _engineThreadPool;
-  std::string _loadedModelName;
+  String _loadedModelName = NO_MODEL_STRING;
+  bool _isModelAvailable = true;
   RAVELatencyState _latencyState;
+  void updateEngine(const String modelName);
 
+  /* Model handling */
+  juce::String _modelsDirPath;
+  std::tuple<StringArray, StringArray> _availableModels;
+  std::vector<std::tuple<String, DynamicObject, NamedValueSet>> _availableModelsAPI;
+  juce::var _parsedJson;
+  juce::String _apiRoot;
 
   /*
    *Allocate some memory to use as the circular_buffer storage
    *for each of the circular_buffer types to be created
   */
   double _sampleRate = 0;
+  double _hostSampleRate = 0;
+
+  void setRateAndBufferSizeDetails(double sampleRate, int blockSize) {
+    _hostSampleRate = sampleRate;
+}
   std::unique_ptr<circular_buffer<float, float>[]> _inBuffer;
   std::unique_ptr<circular_buffer<float, float>[]> _outBuffer;
   std::vector<std::unique_ptr<float[]>> _inModel, _outModel;
@@ -231,13 +187,8 @@ private:
   std::array<std::atomic<float> *, AVAILABLE_DIMS> *_latentScale;
   std::array<std::atomic<float> *, AVAILABLE_DIMS> *_latentBias;
   std::atomic<bool> _isMuted{true};
-
-  enum class muting : int { ignore = 0, mute, unmute };
-
-  std::atomic<muting> _fadeScheduler{muting::mute};
-  LinearSmoothedValue<float> _smoothedFadeInOut;
-  LinearSmoothedValue<float> _smoothedWetGain;
-  LinearSmoothedValue<float> _smoothedDryGain;
+  RAVESmoothingStatus _smoothStatus = RAVESmoothingStatus::ignore;
+  int _smoothingSamples = 20;
 
   // DSP effect
   juce::dsp::Compressor<float> _compressorEffect;
@@ -248,3 +199,4 @@ private:
 
   JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(RaveAP)
 };
+

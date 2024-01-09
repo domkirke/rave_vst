@@ -1,5 +1,6 @@
 #include "PluginProcessor.h"
 #include "PluginEditor.h"
+#include "helpers.h"
 #include <math.h>
 #define JUCE_FORCE_USE_LEGACY_PARAM_IDS
 
@@ -10,10 +11,15 @@ RaveAP::RaveAP()
               .withInput("Input", juce::AudioChannelSet::stereo(), true)
               .withOutput("Output", juce::AudioChannelSet::stereo(), true)),
     #endif
-      _avts(*this, nullptr, Identifier("RAVEValueTree"),
-            createParameterLayout()),
-      _loadedModelName(""), _computeThread(nullptr), _dryWetMixerEffect(BUFFER_LENGTH), _latencyState()
+      _avts(*this, nullptr, Identifier("RAVEValueTree"), createParameterLayout()),
+       _computeThread(nullptr), _dryWetMixerEffect(BUFFER_LENGTH), _latencyState()
 {
+  _rave.reset(new RAVE());
+  /* Model handling */
+  updateModelsDirPath();
+  updateAvailableModels();
+  updateAvailableModelsFromAPI();
+
   _inBuffer = std::make_unique<circular_buffer<float, float>[]>(1);
   _outBuffer = std::make_unique<circular_buffer<float, float>[]>(2);
   _inModel.push_back(std::make_unique<float[]>(BUFFER_LENGTH));
@@ -44,7 +50,7 @@ RaveAP::RaveAP()
   _latencyMode = _avts.getRawParameterValue(rave_parameters::latency_mode);
   _priorTemperature = _avts.getRawParameterValue(rave_parameters::prior_temperature);
   _engineThreadPool = std::make_unique<ThreadPool>(1);
-  _rave.reset(new RAVE());
+  _smoothStatus = RAVESmoothingStatus::ignore;
 
   _avts.addParameterListener(rave_parameters::input_gain, this);
   _avts.addParameterListener(rave_parameters::input_thresh, this);
@@ -53,21 +59,25 @@ RaveAP::RaveAP()
   _avts.addParameterListener(rave_parameters::output_limit, this);
   _avts.addParameterListener(rave_parameters::output_drywet, this);
   _avts.addParameterListener(rave_parameters::latency_mode, this);
+  _avts.addParameterListener(rave_parameters::mute_with_playback, this);
   _dryWetMixerEffect.setMixingRule(juce::dsp::DryWetMixingRule::balanced);
   _editorReady = false;
+
 }
 
 RaveAP::~RaveAP() {
   if (_computeThread)
     _computeThread->join();
+  delete _latentScale;
+  delete _latentBias;
 }
+
 
 void RaveAP::prepareToPlay(double sampleRate, int samplesPerBlock) {
   _sampleRate = sampleRate;
   _inBuffer[0].initialize(BUFFER_LENGTH);
   _outBuffer[0].initialize(BUFFER_LENGTH);
   _outBuffer[1].initialize(BUFFER_LENGTH);
-  _smoothedFadeInOut.reset(sampleRate, 0.2);
   juce::dsp::ProcessSpec specs = {
       sampleRate, static_cast<juce::uint32>(samplesPerBlock), 2};
   _inputGainEffect.prepare(specs);
@@ -81,7 +91,7 @@ void RaveAP::prepareToPlay(double sampleRate, int samplesPerBlock) {
   _compressorEffect.setThreshold(_thresholdValue->load());
   _outputGainEffect.setGainDecibels(_outputGainValue->load());
   _dryWetMixerEffect.setWetMixProportion(_dryWetValue->load() / 100.f);
-  setLatencySamples(pow(2, *_latencyMode));
+  setLatencySamples(static_cast<int>(pow(2, *_latencyMode)));
 }
 
 void RaveAP::releaseResources() {
@@ -102,8 +112,33 @@ float textToValueFunction (const String &value) {
     return value.getFloatValue();
 }
 
+String modelStringFromIndex(RaveAP *ap, int idx, int maximumStringLength) {
+    // String modelName = getAvailableModels()[idx];
+    String modelName = ap->getAvailableModels()[idx];
+    if (modelName.length() > maximumStringLength) {
+        modelName = modelName.substring(0, maximumStringLength);
+    }
+    return modelName;
+}
 
-AudioProcessorValueTreeState::ParameterLayout RaveAP::createParameterLayout() {
+int modelIndexFromString(RaveAP *ap, const String &string) {
+    return ap->getAvailableModels().indexOf(string);
+}
+
+auto makeModelParameter(RaveAP *p, StringArray modelNamesList, int default_index = 0) {
+    using std::placeholders::_1;
+    using std::placeholders::_2;
+    if (modelNamesList.size() == 0)
+        modelNamesList = StringArray("");
+    return std::make_unique<NAAudioParameterChoice>(
+            ParameterID(rave_parameters::current_model, 66), rave_parameters::current_model,
+            modelNamesList, default_index, "Model",
+            std::bind(modelStringFromIndex, p, _1, _2),
+            std::bind(modelIndexFromString, p, _1)
+        );
+}
+
+AudioProcessorValueTreeState::ParameterLayout RaveAP::createParameterLayout(const StringArray availableModels) {
   std::vector<std::unique_ptr<RangedAudioParameter>> params;
   params.push_back(std::make_unique<AudioParameterFloat>(
       ParameterID(rave_parameters::input_gain, 1), rave_parameters::input_gain,
@@ -142,6 +177,7 @@ AudioProcessorValueTreeState::ParameterLayout RaveAP::createParameterLayout() {
       ParameterID(rave_parameters::mute_with_playback, 13), rave_parameters::mute_with_playback, true
   ));
 
+
   String current_name;
   for (size_t i = 0; i < AVAILABLE_DIMS; i++) {
     current_name =
@@ -154,6 +190,11 @@ AudioProcessorValueTreeState::ParameterLayout RaveAP::createParameterLayout() {
         ParameterID(current_name, 20 + i * 2 + 1), current_name, rave_ranges::latentBiasRange, 0.0));
   }
   return {params.begin(), params.end()};
+}
+
+AudioProcessorValueTreeState::ParameterLayout RaveAP::createParameterLayout() {
+    auto [models, modelsPaths] = retrieveAvailableModels(retrieveModelsDirPath());
+    return RaveAP::createParameterLayout(models);
 }
 
 juce::AudioProcessor *JUCE_CALLTYPE createPluginFilter() {

@@ -5,43 +5,61 @@ RaveAPEditor::RaveAPEditor(RaveAP &p, AudioProcessorValueTreeState &vts)
     : AudioProcessorEditor(&p), ChangeListener(), _lightLookAndFeel(),
       _darkLookAndFeel(), audioProcessor(p), _avts(vts), _foldablePanel(p),
       _bgFull(ImageCache::getFromMemory(BinaryData::bg_full_png,
-                                        BinaryData::bg_full_pngSize)),
-      _apiRoot(getApiRoot()) {
+                                        BinaryData::bg_full_pngSize))
+  {
   String path =
       juce::File::getSpecialLocation(juce::File::userApplicationDataDirectory)
           .getFullPathName();
-
-  if (SystemStats::getOperatingSystemType() ==
-      SystemStats::OperatingSystemType::MacOSX)
-    path += String("/Application Support");
-  path += String("/ACIDS/RAVE/");
-
-  _modelsDirPath = File(path);
-  if (_modelsDirPath.isDirectory() == false) {
-    _modelsDirPath.createDirectory();
-  }
-
-  getAvailableModelsFromAPI();
 
   _header.setLookAndFeel(&_darkLookAndFeel);
   _modelPanel.setLookAndFeel(&_darkLookAndFeel);
   _modelExplorer.setLookAndFeel(&_lightLookAndFeel);
   _foldablePanel.setLookAndFeel(&_lightLookAndFeel);
 
-  _modelExplorer._downloadButton.onClick = [this]() { downloadModelFromAPI(); };
+  _modelDownloadPool = std::make_unique<ThreadPool>(1);
+
+  _modelExplorer._downloadButton.onClick = [this]() {
+    downloadModel(_modelExplorer._modelsList.getSelectedRow());
+      // std::tuple<URL, File> model_infos;
+      // try {
+      //   _modelExplorer.displayDownload();
+      //   model_infos = audioProcessor.getFileForDownload(_modelExplorer._modelsList.getSelectedRow());
+      // } catch (const std::runtime_error& e) {
+      //   AlertWindow::showAsync(MessageBoxOptions()
+      //                       .withIconType(MessageBoxIconType::WarningIcon)
+      //                       .withTitle("Network Warning:")
+      //                       .withMessage("Could not retrieve information for target model")
+      //                       .withButton("OK"),
+      //                       nullptr);
+      //   return;
+      // }
+      // auto url = std::get<0>(model_infos);
+      // auto outputFile = std::get<1>(model_infos);
+
+      // if (hasFailed) {
+      //   std::cerr << "[-] Network - Failed to download model" << std::endl;
+      //   AlertWindow::showAsync(MessageBoxOptions()
+      //                              .withIconType(MessageBoxIconType::WarningIcon)
+      //                              .withTitle("Network Warning:")
+      //                              .withMessage("Failed to download model")
+      //                              .withButton("OK"),
+      //                               nullptr);
+      //   return;
+      // }
+      // while (!res->isFinished())
+      //   Thread::sleep(500); 
+      // audioProcessor.updateAvailableModels(); 
+      // updateModelComboList();
+  };
   _modelExplorer._importButton.onClick = [this]() { importModel(); };
 
   _modelPanel.setSampleRate(p.getSampleRate());
 
-  detectAvailableModels();
   // Model manager button stuff
+   updateModelComboList();
+   updateModelExplorer();
   _header._modelComboBox.onChange = [this]() {
-    String modelPath =
-        _availableModelsPaths[_header._modelComboBox.indexOfItemId(
-            _header._modelComboBox.getSelectedId())];
-    audioProcessor.updateEngine(modelPath.toStdString());
-
-
+    audioProcessor.loadModel(_header._modelComboBox.getText());
   };
 
   _header.connectVTS(vts);
@@ -77,8 +95,45 @@ RaveAPEditor::RaveAPEditor(RaveAP &p, AudioProcessorValueTreeState &vts)
   setResizable(false, false);
   getConstrainer()->setMinimumSize(996, 560);
   setSize(996, 560);
-  // startTimer(100.);
+}
 
+void RaveAPEditor::updateModelComboList() {
+   MessageManagerLock mml (Thread::getCurrentThread());
+   while (!mml.lockWasGained()) { Thread::sleep(10); }
+  _header._modelComboBox.clear();
+  auto availableModels = audioProcessor.getAvailableModels();
+  if (availableModels.size() == 0) {
+    _header._modelComboBox.addItem(String("-- no model available --"), 1);
+    _header._modelComboBox.setItemEnabled(1, false);
+  } else {
+    _header._modelComboBox.addItemList(availableModels, 1);
+    auto modelIdx = audioProcessor.getCurrentModelIdx();
+    if ((audioProcessor.isModelAvailable()) && (modelIdx > -1)) {
+      _header._modelComboBox.setSelectedItemIndex(audioProcessor.getCurrentModelIdx(), NotificationType::dontSendNotification);
+    } else {
+      String emptyItemString;
+      if (audioProcessor.getCurrentModelName() == "") {
+        emptyItemString = String("-- no model --");
+        _header._modelComboBox.setText(emptyItemString);
+      } else {
+        emptyItemString = audioProcessor.getCurrentModelName();
+        _header._modelComboBox.addItem(emptyItemString, availableModels.size() + 1);
+        _header._modelComboBox.setSelectedItemIndex(availableModels.size(), NotificationType::dontSendNotification);
+        _header._modelComboBox.setItemEnabled(availableModels.size()+1, false);
+      }
+    }
+  }
+}
+
+void RaveAPEditor::updateModelExplorer() {
+  auto apiModelInfo = audioProcessor.getAvailableModelsFromAPI();
+  _modelExplorer._ApiModelsNames.clear();
+  _modelExplorer._ApiModelsData.clear();
+  for (const auto& [name, json, props] : apiModelInfo) {
+    _modelExplorer._ApiModelsNames.add(name);
+    _modelExplorer._ApiModelsData.add(props);
+  }
+  _modelExplorer._modelsList.updateContent();
 }
 
 RaveAPEditor::~RaveAPEditor() {
@@ -97,7 +152,7 @@ void RaveAPEditor::importModel() {
         File sourceFile;
         auto results = chooser.getURLResults();
 
-        for (auto result : results) {
+        for (const URL result : results) {
           if (result.isLocalFile()) {
             sourceFile = result.getLocalFile();
           } else {
@@ -106,19 +161,13 @@ void RaveAPEditor::importModel() {
         }
         if (sourceFile.getFileExtension() == ".ts" &&
             sourceFile.getSize() > 0) {
-          sourceFile.copyFileTo(_modelsDirPath.getNonexistentChildFile(
+          sourceFile.copyFileTo(File(audioProcessor.getModelsDirPath()).getNonexistentChildFile(
               sourceFile.getFileName(), ".ts"));
-          detectAvailableModels();
+          audioProcessor.updateAvailableModels();
         }
       });
 }
 
-/*
-void RaveAPEditor::timerCallback() {
-  //_console.setText(String(audioProcessor.getLatencySamples()),
-juce::dontSendNotification);
-}
-*/
 
 void RaveAPEditor::resized() {
   // Child components should not handle margins, do it here
@@ -155,60 +204,44 @@ void RaveAPEditor::log(String /*str*/) {}
 
 void RaveAPEditor::changeListenerCallback(ChangeBroadcaster * /*source*/) {
   if (audioProcessor._rave != nullptr) {
-    // std::cout << "set prior in changeListenerCallback to" <<
-    // audioProcessor._rave->hasPrior() << std::endl;
-    //_modelPanel.setPriorEnabled(audioProcessor._rave->hasPrior());
     _foldablePanel.setBufferSizeRange(
         audioProcessor._rave->getValidBufferSizes());
+    _modelPanel.setPriorEnabled(audioProcessor._rave->hasPrior());
   }
 }
 
-// Directory search functions
-
-bool pathExist(const std::string &s) {
-  struct stat buffer;
-  return (stat(s.c_str(), &buffer) == 0);
+void RaveAPEditor::downloadModel(const int apiModelIdx) {
+  auto model_infos = audioProcessor.getFileForDownload(apiModelIdx);
+  auto [url, outputPath] = model_infos;
+  juce::ScopedLock downloadLock(_modelDownloadMutex);
+  _modelDownloadPool->addJob(new ModelDownloadJob(audioProcessor, *this, url, outputPath), true);
 }
 
-std::string capitalizeFirstLetter(std::string text) {
-  for (unsigned int x = 0; x < text.length(); x++) {
-    if (x == 0) {
-      text[x] = toupper(text[x]);
-    } else if (text[x - 1] == ' ') {
-      text[x] = toupper(text[x]);
-    }
+void RaveAPEditor::finished(URL::DownloadTask *task, bool success) {
+  
+  if (success) {
+    std::cout << "[+] Network - Model downloaded" << std::endl;
+    // AlertWindow::showAsync(MessageBoxOptions()
+    //                            .withIconType(MessageBoxIconType::InfoIcon)
+    //                            .withTitle("Information:")
+    //                            .withMessage("Model successfully downloaded")
+    //                            .withButton("OK"),
+    //                        nullptr);
+    audioProcessor.updateAvailableModels();
+    updateModelComboList();
+  } else {
+    std::cerr << "[-] Network - Failed to download model" << std::endl;
+    // AlertWindow::showAsync(MessageBoxOptions()
+    //                            .withIconType(MessageBoxIconType::WarningIcon)
+    //                            .withTitle("Network Warning:")
+    //                            .withMessage("Failed to download model")
+    //                            .withButton("OK"),
+    //                        nullptr);
   }
-  return text;
 }
 
-void RaveAPEditor::detectAvailableModels() {
-  std::string ext(".ts");
-  // Reset list of available models
-  _availableModelsPaths.clear();
-  _availableModels.clear();
-  if (!pathExist(_modelsDirPath.getFullPathName().toStdString())) {
-    std::cerr << "[-] - Model directory not found" << '\n';
-    return;
-  }
-  try {
-    for (auto &p : std::filesystem::recursive_directory_iterator(
-             _modelsDirPath.getFullPathName().toStdString())) {
-      if (p.path().extension() == ext) {
-        _availableModelsPaths.add(String(p.path().string()));
-        // Prepare a clean model name for display
-        auto tmpModelName = p.path().stem().string();
-        std::replace(tmpModelName.begin(), tmpModelName.end(), '_', ' ');
-        tmpModelName = capitalizeFirstLetter(tmpModelName);
-        _availableModels.add(tmpModelName);
-      }
-    }
-  } catch (const std::filesystem::filesystem_error &e) {
-    std::cerr << "[-] - Model not found" << '\n';
-    std::cerr << e.what();
-  }
-  // Reset the comboBox and repopulate with the new detected values
-  _header._modelComboBox.clear();
-  _header._modelComboBox.addItemList(_availableModels, 1);
-  // TODO: stay on the same model as before
-  _header._modelComboBox.setSelectedItemIndex(0);
+void RaveAPEditor::progress(URL::DownloadTask *task, int64 bytesDownloaded,
+                            int64 totalLength) {
+  _modelExplorer.setDownloadProgress((double)bytesDownloaded / (double)totalLength);
+  // std::cout << bytesDownloaded << "/" << totalLength << '\n';
 }

@@ -54,30 +54,18 @@ juce::AudioProcessorEditor *RaveAP::createEditor() {
   return new RaveAPEditor(*this, _avts);
 }
 
-void RaveAP::getStateInformation(juce::MemoryBlock &destData) {
-  // You should use this method to store your parameters in the memory block.
-  // You could do that either as raw data, or use the XML or ValueTree classes
-  // as intermediaries to make it easy to save and load complex data.
-  auto state = _avts.copyState();
-  std::unique_ptr<XmlElement> xml(state.createXml());
-  copyXmlToBinary(*xml, destData);
+
+void RaveAP::mute() {
+ _smoothStatus = RAVESmoothingStatus::needsMute;
 }
 
-void RaveAP::setStateInformation(const void *data, int sizeInBytes) {
-  // You should use this method to restore your parameters from this memory
-  // block, whose contents will have been created by the getStateInformation()
-  // call.
-  std::unique_ptr<XmlElement> xmlState(getXmlFromBinary(data, sizeInBytes));
-  if (xmlState.get() != nullptr)
-    if (xmlState->hasTagName(_avts.state.getType()))
-      _avts.replaceState(ValueTree::fromXml(*xmlState));
+void RaveAP::unmute() { 
+ _smoothStatus = RAVESmoothingStatus::needsDemute;
 }
 
-void RaveAP::mute() { _fadeScheduler.store(muting::mute); }
-
-void RaveAP::unmute() { _fadeScheduler.store(muting::unmute); }
-
-const bool RaveAP::getIsMuted() { return _isMuted.load(); }
+const bool RaveAP::getIsMuted() {
+   return _isMuted.load(); 
+}
 
 #ifndef JucePlugin_PreferredChannelConfigurations
 bool RaveAP::isBusesLayoutSupported(const BusesLayout &layouts) const {

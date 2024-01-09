@@ -35,6 +35,8 @@ public:
     setColour(TextButton::buttonOnColourId, DARKER_STRONG);
     setColour(TextButton::textColourOnId, WHITE);
     setColour(TextButton::textColourOffId, WHITE);
+    setColour(ProgressBar::backgroundColourId, TRANSPARENT);
+    setColour(ProgressBar::foregroundColourId, DARKER_STRONG);
   }
 
   // It's almost the same as the default one, but we remove the ugly tick for
@@ -108,6 +110,150 @@ public:
       }
     }
   }
+
+void drawProgressBar (Graphics& g, ProgressBar& progressBar,
+                                      int width, int height, double progress,
+                                      const String& textToShow) override
+{
+    switch (progressBar.getResolvedStyle())
+    {
+        case ProgressBar::Style::linear:
+            drawLinearProgressBar (g, progressBar, width, height, progress, textToShow);
+            break;
+
+        case ProgressBar::Style::circular:
+            drawCircularProgressBar (g, progressBar, textToShow);
+            break;
+    }
+}
+
+void drawLinearProgressBar (Graphics& g, const ProgressBar& progressBar,
+                                            int width, int height, double progress,
+                                            const String& textToShow)
+{
+    auto background = progressBar.findColour (ProgressBar::backgroundColourId);
+    auto foreground = progressBar.findColour (ProgressBar::foregroundColourId);
+
+    auto barBounds = progressBar.getLocalBounds().toFloat();
+
+    g.setColour (background);
+    g.fillRoundedRectangle (barBounds, (float) progressBar.getHeight() * 0.5f);
+
+    if (progress >= 0.0f && progress <= 1.0f)
+    {
+        Path p;
+        p.addRoundedRectangle (barBounds, (float) progressBar.getHeight() * 0.5f);
+        g.reduceClipRegion (p);
+
+        barBounds.setWidth (barBounds.getWidth() * (float) progress);
+        g.setColour (foreground);
+        g.fillRoundedRectangle (barBounds, (float) progressBar.getHeight() * 0.5f);
+    }
+    else
+    {
+        // spinning bar..
+        g.setColour (background);
+
+        auto stripeWidth = height * 2;
+        auto position = static_cast<int> (Time::getMillisecondCounter() / 15) % stripeWidth;
+
+        Path p;
+
+        for (auto x = static_cast<float> (-position); x < (float) (width + stripeWidth); x += (float) stripeWidth)
+            p.addQuadrilateral (x, 0.0f,
+                                x + (float) stripeWidth * 0.5f, 0.0f,
+                                x, static_cast<float> (height),
+                                x - (float) stripeWidth * 0.5f, static_cast<float> (height));
+
+        Image im (Image::ARGB, width, height, true);
+
+        {
+            Graphics g2 (im);
+            g2.setColour (foreground);
+            g2.fillRoundedRectangle (barBounds, (float) progressBar.getHeight() * 0.5f);
+        }
+
+        g.setTiledImageFill (im, 0, 0, 0.85f);
+        g.fillPath (p);
+    }
+
+    if (textToShow.isNotEmpty())
+    {
+      // Here we added support for color (was ugly and not lisible)
+      if (progress < 0.4) {
+        g.setColour (DARKER_STRONG);
+      } else {
+        g.setColour (WHITE);
+      }
+        g.setFont ((float) height * 0.6f);
+        g.drawText (textToShow, 0, 0, width, height, Justification::centred, false);
+    }
+}
+
+
+void drawCircularProgressBar (Graphics& g, const ProgressBar& progressBar,
+                                              const String& textToShow)
+{
+    const auto background = progressBar.findColour (ProgressBar::backgroundColourId);
+    const auto foreground = progressBar.findColour (ProgressBar::foregroundColourId);
+
+    const auto barBounds = progressBar.getLocalBounds().reduced (2, 2).toFloat();
+    const auto size = jmin (barBounds.getWidth(), barBounds.getHeight());
+
+    const auto rotationInDegrees  = static_cast<float> ((Time::getMillisecondCounter() / 10) % 360);
+    const auto normalisedRotation = rotationInDegrees / 360.0f;
+
+    constexpr auto rotationOffset = 22.5f;
+    constexpr auto maxRotation    = 315.0f;
+
+    auto startInDegrees = rotationInDegrees;
+    auto endInDegrees   = startInDegrees + rotationOffset;
+
+    if (normalisedRotation >= 0.25f && normalisedRotation < 0.5f)
+    {
+        auto rescaledRotation = (normalisedRotation * 4.0f) - 1.0f;
+        endInDegrees = startInDegrees + rotationOffset + (maxRotation * rescaledRotation);
+    }
+    else if (normalisedRotation >= 0.5f && normalisedRotation <= 1.0f)
+    {
+        endInDegrees = startInDegrees + rotationOffset + maxRotation;
+        auto rescaledRotation = 1.0f - ((normalisedRotation * 2.0f) - 1.0f);
+        startInDegrees = endInDegrees - rotationOffset - (maxRotation * rescaledRotation);
+    }
+
+    g.setColour (background);
+    Path arcPath2;
+    arcPath2.addCentredArc (barBounds.getCentreX(),
+                            barBounds.getCentreY(),
+                            size * 0.5f,
+                            size * 0.5f, 0.0f,
+                            0.0f,
+                            MathConstants<float>::twoPi,
+                            true);
+    g.strokePath (arcPath2, PathStrokeType (4.0f));
+
+    g.setColour (foreground);
+    Path arcPath;
+    arcPath.addCentredArc (barBounds.getCentreX(),
+                           barBounds.getCentreY(),
+                           size * 0.5f,
+                           size * 0.5f,
+                           0.0f,
+                           degreesToRadians (startInDegrees),
+                           degreesToRadians (endInDegrees),
+                           true);
+
+    arcPath.applyTransform (AffineTransform::rotation (normalisedRotation * MathConstants<float>::pi * 2.25f, barBounds.getCentreX(), barBounds.getCentreY()));
+    g.strokePath (arcPath, PathStrokeType (4.0f));
+
+    if (textToShow.isNotEmpty())
+    {
+        g.setColour (progressBar.findColour (TextButton::textColourOffId));
+        g.setFont ({ 12.0f, Font::italic });
+        g.drawText (textToShow, barBounds, Justification::centred, false);
+    }
+}
+
 
   void drawRotarySlider(Graphics &g, int x, int y, int width, int height,
                         float sliderPos, const float rotaryStartAngle,

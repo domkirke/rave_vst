@@ -6,6 +6,7 @@
 #define DEBUG_PERFORM 0
 
 void RaveAP::modelPerform() {
+  // std::cout << "perform; is muted : " << _isMuted.load() << std::endl;
   if (_rave.get() && !_isMuted.load()) {
     c10::InferenceMode guard(true);
     // encode
@@ -75,7 +76,6 @@ void RaveAP::modelPerform() {
       latent_traj_mean.index_put_(
           {0, i}, (latent_traj_mean.index({0, i}) * scale + bias));
     }
-    _rave->writeLatentBuffer(latent_traj_mean);
 
 #if DEBUG_PERFORM
     std::cout << "scale & bias applied" << std::endl;
@@ -84,6 +84,7 @@ void RaveAP::modelPerform() {
     // adding latent jitter on meaningful dimensions
     float jitter_amount = _latentJitterValue->load();
     latent_traj = latent_traj + jitter_amount * torch::randn_like(latent_traj);
+    _rave->writeLatentBuffer(latent_traj);
 
 #if DEBUG_PERFORM
     std::cout << "jitter applied" << std::endl;
@@ -150,9 +151,6 @@ void RaveAP::modelPerform() {
       _latencyState.endTimer();
       updateLatency();
     }
-    if (_smoothedFadeInOut.getCurrentValue() < EPSILON) {
-      _isMuted.store(true);
-    }
   }
 }
 
@@ -165,37 +163,28 @@ void RaveAP::processBlock(juce::AudioBuffer<float> &buffer,
   std::cout << "processing block..." << std::endl;
 # endif
 
-
   juce::ScopedNoDenormals noDenormals;
   const int nSamples = buffer.getNumSamples();
   const int nChannels = buffer.getNumChannels();
 
-
   // mute if pause
-  AudioPlayHead *playHead = this->getPlayHead();
-  if ((playHead != nullptr) && (bool)(_muteWithPlayback->load())) {
-    AudioPlayHead::CurrentPositionInfo info;
-    bool hasDawInformation = playHead->getCurrentPosition(info);
-    if (hasDawInformation) {
-      bool isPlaying = info.isPlaying;
+  if ((getPlayHead() != nullptr) && (bool)(_muteWithPlayback->load())) {
+    auto positionInfo = this->getPlayHead()->getPosition();
+    if (positionInfo.hasValue()) {
+      bool isPlaying = positionInfo->getIsPlaying();
       _plays = isPlaying;
       if (isPlaying && _isMuted.load()) {
         unmute();
       } else if (!isPlaying && !_isMuted.load()) {
         mute();
         _inBuffer.get()->reset();
-        _outBuffer.get()->reset();
+        // _outBuffer.get()->reset();
       }
     }
   }
 
-  // fade parameters
-  const muting muteConfig = _fadeScheduler.load();
-  if (muteConfig == muting::mute) {
-    _smoothedFadeInOut.setTargetValue(0.f);
-  } else if (muteConfig == muting::unmute) {
-    _smoothedFadeInOut.setTargetValue(1.f);
-    _isMuted.store(false);
+  if (_isMuted.load() && _smoothStatus != RAVESmoothingStatus::needsDemute) {
+    return;
   }
 
   juce::dsp::AudioBlock<float> ab(buffer);
@@ -273,13 +262,28 @@ void RaveAP::processBlock(juce::AudioBuffer<float> &buffer,
 #endif
 
   _outputGainEffect.process(out_context);
-  bool is_limiting = static_cast<bool>((*_limitValue).load());
-  if (is_limiting)
+  if (bool is_limiting = static_cast<bool>((*_limitValue).load()); is_limiting)
     _limiterEffect.process(out_context);
   _dryWetMixerEffect.mixWetSamples(out_buffer);
+
   buffer.copyFrom(0, 0, out_buffer, 0, 0, nSamples);
   if (nChannels == 2)
     buffer.copyFrom(1, 0, out_buffer, 1, 0, nSamples);
+
+  // smooth fading
+  if (_smoothStatus == RAVESmoothingStatus::needsMute) {
+    int smoothInSamps = std::min(_smoothingSamples, buffer.getNumSamples());
+    buffer.applyGainRamp(0, smoothInSamps, 1., 0.);
+    buffer.applyGain(smoothInSamps, buffer.getNumSamples() - smoothInSamps, 0.);
+    _smoothStatus = RAVESmoothingStatus::ignore;
+    _isMuted.store(true);
+  } else if (_smoothStatus == RAVESmoothingStatus::needsDemute) {
+    int smoothInSamps = std::min(_smoothingSamples, buffer.getNumSamples());
+    buffer.applyGainRamp(0, smoothInSamps, 0., 1.);
+    buffer.applyGain(smoothInSamps, buffer.getNumSamples() - smoothInSamps, 0.);
+    _smoothStatus = RAVESmoothingStatus::ignore;
+    _isMuted.store(false);
+  }
 
 #if DEBUG_PERFORM
   std::cout << "sortie : " << buffer.getMagnitude(0, nSamples) << std::endl;
@@ -301,6 +305,10 @@ void RaveAP::parameterChanged(const String &parameterID, float newValue) {
     _inBuffer.get()->reset();
     _latencyState.setRequested();
     // setLatencySamples((int)latency_samples);
+  } else if (parameterID == rave_parameters::mute_with_playback) {
+    if (!_muteWithPlayback->load() && _rave.get()->hasModel()) {
+      unmute();
+    }
   }
 }
 
@@ -318,15 +326,4 @@ void RaveAP::updateBufferSizes() {
               << std::endl;
     *_latencyMode = static_cast<int>(log2(b));
   }
-}
-
-void RaveAP::updateEngine(const std::string modelFile) {
-  if (modelFile == _loadedModelName)
-    return;
-  _loadedModelName = modelFile;
-  juce::ScopedLock irCalculationlock(_engineUpdateMutex);
-  if (_engineThreadPool) {
-    _engineThreadPool->removeAllJobs(true, 100);
-  }
-  _engineThreadPool->addJob(new UpdateEngineJob(*this, modelFile), true);
 }

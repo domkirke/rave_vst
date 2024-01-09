@@ -13,6 +13,7 @@ endif()
 ### Import compiler settings ###
 include(compiler_settings)
 setup_compilers()
+add_definitions(-w)
 
 
 ### Dependency versions ###

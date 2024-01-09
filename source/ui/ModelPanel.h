@@ -244,7 +244,6 @@ public:
 
   void timerCallback() {
     at::Tensor latent = _model->getLatentBuffer();
-    // TODO: A change is to be made by Axel, and we'll get a tensor with dims
     // (_latentsNbr * LINES_BUFFER_SIZE)
 
     // We're checking the tensor's number of dimensions here, not a specific
@@ -254,7 +253,10 @@ public:
     latent = latent[0];
     assert(latent.sizes()[0] > 0);
     size_t latentSizes = (size_t)latent.sizes()[0];
-    assert(latentSizes == _latentsNbr);
+    if (latentSizes > _latentsNbr) {
+      // std::cout << "Warning : model has " << latentSizes << " dimensions, but in VST a maximum of " << _latentsNbr << " can be controlled / visualized" << std::endl;
+      latentSizes = _latentsNbr;
+    }
     int latentTrajLength = latent.sizes()[1];
     int64_t currentIdx =
         std::min((int64_t)round((float)_idxCounter /

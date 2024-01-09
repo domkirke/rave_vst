@@ -41,7 +41,7 @@ public:
     _compressorRatio.setBounds(b_colRight1);
   }
 
-  void paint(juce::Graphics &g) {
+  void paint(juce::Graphics &g) override {
     auto b_area = getLocalBounds().toFloat();
     // Title line
     b_area = b_area.withTrimmedRight(UI_MARGIN_SIZE);
