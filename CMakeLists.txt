@@ -15,7 +15,6 @@ include(compiler_settings)
 setup_compilers()
 add_definitions(-w)
 
-
 ### Dependency versions ###
 set(LIB_JUCE_TAG "7.0.8")
 
@@ -50,7 +49,11 @@ find_package(Torch REQUIRED)
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${TORCH_CXX_FLAGS}")
 
 ### Plugin Project Setup ###
-set(active_formats AU VST3 Standalone)
+if (APPLE)
+	set(active_formats AU VST3 Standalone)
+else()
+	set(active_formats VST3 Standalone)
+endif()
 juce_add_plugin("${PROJECT_NAME}"
     FORMATS ${active_formats} 
     PRODUCT_NAME "RAVE"
@@ -73,6 +76,11 @@ juce_add_plugin("${PROJECT_NAME}"
 target_compile_features("${PROJECT_NAME}" PUBLIC cxx_std_17)
 get_property(project_targets DIRECTORY "${PROJECT_SOURCE_DIR}" PROPERTY BUILDSYSTEM_TARGETS)
 set_target_properties(${project_targets} PROPERTIES CXX_EXTENSIONS OFF)
+if(UNIX AND NOT APPLE)
+	add_compile_options(-fPIC)
+endif()
+
+
 
 ### Adding source ###
 add_subdirectory(source)
@@ -94,12 +102,15 @@ if (UNIX AND NOT APPLE)
 
     execute_process(COMMAND ${CMAKE_COMMAND} -E tar -xf mkl_cc.tgz
                     WORKING_DIRECTORY ${mkl_dir})
+    message("done")
 
     file(REMOVE ${mkl_dir}/mkl_cc.tgz)
     configure_file(
       "${TORCH_INSTALL_PREFIX}/lib/mklml_lnx_2018.0.20170425/lib/libiomp5.so"
       "${TORCH_INSTALL_PREFIX}/lib/libiomp5.so"
     )
+
+
   endif()
   set(libtorch_files
     "${TORCH_INSTALL_PREFIX}/lib/libtorch.so"
@@ -132,11 +143,18 @@ juce_add_binary_data(${ImagesTarget} SOURCES ${images})
 target_link_libraries(${PROJECT_NAME} PRIVATE ${ImagesTarget})
 
 ### Link Torch libraries and headers ###
+if(APPLE) 
+	set(lib_suffix "dylib")
+elseif (UNIX AND NOT APPLE)
+	set(lib_suffix "so")
+elseif (MSVC) 
+	set(lib_suffix "dll")
+endif()
 set(libtorch_files
-    "${TORCH_INSTALL_PREFIX}/lib/libtorch.dylib"
-    "${TORCH_INSTALL_PREFIX}/lib/libtorch_cpu.dylib"
-    "${TORCH_INSTALL_PREFIX}/lib/libc10.dylib"
-    "${TORCH_INSTALL_PREFIX}/lib/libiomp5.dylib"
+    "${TORCH_INSTALL_PREFIX}/lib/libtorch.${lib_suffix}"
+    "${TORCH_INSTALL_PREFIX}/lib/libtorch_cpu.${lib_suffix}"
+    "${TORCH_INSTALL_PREFIX}/lib/libc10.${lib_suffix}"
+    "${TORCH_INSTALL_PREFIX}/lib/libiomp5.${lib_suffix}"
 )
 target_include_directories(${PROJECT_NAME} PUBLIC ${TORCH_INSTALL_PREFIX}/include/torch/*.h)
 
@@ -199,8 +217,8 @@ set(juce_header "${juce_library_code}/JuceHeader.h")
 list(REMOVE_ITEM project_sources "${juce_header}")
 source_group("JUCE Library Code" FILES "${juce_header}")
 source_group("JUCE Library Code/CMake Rules" FILES "${juce_header}.rule")
-source_group(TREE "${PROJECT_SOURCE_DIR}/Source" FILES "Source/*")
-source_group(TREE "${PROJECT_SOURCE_DIR}/Build/torch" FILES "Build/torch")
+source_group(TREE "${PROJECT_SOURCE_DIR}/source" FILES "source/*")
+source_group(TREE "${PROJECT_SOURCE_DIR}/build/torch" FILES "build/torch")
 if(TARGET ${ImagesTarget})
     get_target_property(project_assets ${ImagesTarget} SOURCES)
     source_group("" FILES ${project_assets})
